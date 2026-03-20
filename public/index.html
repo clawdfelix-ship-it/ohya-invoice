@@ -665,18 +665,36 @@ function initExcelUpload() {
 }
 
 async function doExcelImport() {
-  alert('🔍 doExcelImport 被調用了！');
   if (!excelData.length) { 
     alert('❌ 沒有可匯入的產品資料');
     return; 
   }
+  
+  const BATCH_SIZE = 100; // 每批上傳數量
+  const totalBatches = Math.ceil(excelData.length / BATCH_SIZE);
+  
   try {
-    alert('📤 正在上傳 ' + excelData.length + ' 項產品...');
-    await api('/api/products/bulk', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({products: excelData}) });
+    let uploadedCount = 0;
+    
+    for (let i = 0; i < excelData.length; i += BATCH_SIZE) {
+      const batch = excelData.slice(i, i + BATCH_SIZE);
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+      
+      alert('📤 上傳中... 第 ' + batchNum + '/' + totalBatches + ' 批 (' + batch.length + ' 項)');
+      
+      await api('/api/products/bulk', { 
+        method: 'POST', 
+        headers: {'Content-Type':'application/json'}, 
+        body: JSON.stringify({products: batch})
+      });
+      
+      uploadedCount += batch.length;
+    }
+    
     closeModal('excel'); 
     await loadData(); 
     renderProducts(); 
-    alert('✅ 已匯入 ' + excelData.length + ' 項產品！');
+    alert('✅ 已成功匯入 ' + uploadedCount + ' 項產品！');
   } catch(err) {
     alert('❌ 匯入失敗：' + err.message);
   }
