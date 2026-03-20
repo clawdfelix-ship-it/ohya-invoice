@@ -405,6 +405,8 @@ function renderInvoices() {
           </div>
           <div class="list-item-actions">
             <span class="status ${i.paid ? 'paid' : 'unpaid'}">${i.paid ? '已付' : '未付'}</span>
+            <button class="btn btn-secondary btn-sm" onclick="downloadInvoicePDF('${i.id}')">📄 PDF</button>
+            ${i.client_email ? `<button class="btn btn-secondary btn-sm" onclick="sendInvoiceEmail('${i.id}')">📧 發送</button>` : ''}
             ${i.paid ? '' : `<button class="btn btn-primary btn-sm" onclick="markInvoicePaid('${i.id}')">已收費</button>`}
             <button class="btn btn-danger btn-sm" onclick="deleteInvoice('${i.id}')">刪除</button>
           </div>
@@ -492,12 +494,178 @@ async function saveInvoice() {
   const inv = { id: 'INV-' + Date.now(), no: document.getElementById('inv-no').value, client, client_email: document.getElementById('inv-email').value.trim(), client_address: document.getElementById('inv-address').value.trim(), date: document.getElementById('inv-date').value, items: validItems, paid: false, margin, exchange_rate: rate };
   localStorage.setItem('lastMargin', margin);
   localStorage.setItem('lastRate', rate);
-  await api('/api/invoices', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(inv) });
-  closeModal('invoice'); await loadData(); renderInvoices();
+  try {
+    await api('/api/invoices', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(inv) });
+    closeModal('invoice');
+    await loadData();
+    renderInvoices();
+  } catch(err) {
+    alert('❌ 儲存發票失敗：' + err.message);
+  }
 }
 
-async function markInvoicePaid(id) { await api('/api/invoices/' + id + '/mark-paid', { method: 'POST' }); await loadData(); renderDashboard(); renderInvoices(); }
-async function deleteInvoice(id) { if (!confirm('確定刪除這張發票？')) return; await api('/api/invoices/' + id, { method: 'DELETE' }); await loadData(); renderInvoices(); }
+async function markInvoicePaid(id) { 
+  try {
+    await api('/api/invoices/' + id + '/mark-paid', { method: 'POST' }); 
+    await loadData(); 
+    renderDashboard(); 
+    renderInvoices(); 
+  } catch(err) {
+    alert('❌ 更新失敗：' + err.message);
+  }
+}
+
+async function deleteInvoice(id) { 
+  if (!confirm('確定刪除這張發票？')) return; 
+  try {
+    await api('/api/invoices/' + id, { method: 'DELETE' }); 
+    await loadData(); 
+    renderInvoices(); 
+  } catch(err) {
+    alert('❌ 刪除失敗：' + err.message);
+  }
+}
+
+// PDF generation using browser print
+function generateInvoiceHTML(invoice) {
+  const rate = invoice.exchange_rate || 0.052;
+  const items = invoice.items || [];
+  const subtotal = items.reduce((s, it) => s + (it.qty || 1) * (it.price || 0), 0);
+  const totalCostJpy = items.reduce((s, it) => s + (it.qty || 1) * (it.costJpy || 0), 0);
+  const totalCostHkd = totalCostJpy * rate;
+  const profit = subtotal - totalCostHkd;
+  const margin = subtotal > 0 ? (profit / subtotal * 100).toFixed(1) : 0;
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Invoice ${invoice.no}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px; color: #222; padding: 40px; max-width: 800px; margin: 0 auto; }
+  .header { display: flex; justify-content: space-between; margin-bottom: 40px; border-bottom: 2px solid #00d4aa; padding-bottom: 20px; }
+  .header h1 { font-size: 24px; color: #00d4aa; }
+  .invoice-meta { text-align: right; }
+  .invoice-meta p { margin-bottom: 4px; }
+  .invoice-meta .no { font-size: 18px; font-weight: bold; }
+  .invoice-meta .status { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-top: 4px; }
+  .status.paid { background: #00d4aa22; color: #00d4aa; }
+  .status.unpaid { background: #ff6b6b22; color: #ff6b6b; }
+  .client-info { margin-bottom: 30px; background: #f5f5f5; padding: 16px; border-radius: 8px; }
+  .client-info h3 { font-size: 12px; color: #888; margin-bottom: 6px; text-transform: uppercase; }
+  .client-info p { font-size: 15px; margin-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+  th { background: #1a1a2e; color: #fff; padding: 10px 12px; text-align: left; font-size: 12px; font-weight: 600; }
+  td { padding: 10px 12px; border-bottom: 1px solid #eee; font-size: 13px; }
+  tr:last-child td { border-bottom: none; }
+  .text-right { text-align: right; }
+  .text-center { text-align: center; }
+  .summary { display: flex; justify-content: flex-end; }
+  .summary-table { width: 300px; }
+  .summary-table td { padding: 8px 12px; }
+  .summary-table .label { color: #888; font-size: 13px; }
+  .summary-table .value { text-align: right; font-weight: 600; }
+  .summary-table .total { background: #1a1a2e; color: #fff; font-size: 15px; }
+  .summary-table .total td { color: #00d4aa; }
+  .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; color: #888; font-size: 12px; text-align: center; }
+  @media print {
+    body { padding: 20px; }
+    .no-print { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>💼 INVOICE</h1>
+    <p style="color:#888;margin-top:4px">會計開單系統</p>
+  </div>
+  <div class="invoice-meta">
+    <p class="no">${invoice.no}</p>
+    <p>${invoice.date}</p>
+    <span class="status ${invoice.paid ? 'paid' : 'unpaid'}">${invoice.paid ? 'PAID 已付' : 'UNPAID 未付'}</span>
+  </div>
+</div>
+
+<div class="client-info">
+  <h3>Bill To / 收件人</h3>
+  <p><strong>${invoice.client}</strong></p>
+  ${invoice.client_email ? `<p>📧 ${invoice.client_email}</p>` : ''}
+  ${invoice.client_address ? `<p>📍 ${invoice.client_address}</p>` : ''}
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Description 項目描述</th>
+      <th class="text-center">Qty 數量</th>
+      <th class="text-right">Unit Price (HKD)</th>
+      <th class="text-right">Total (HKD)</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${items.map((it, idx) => `
+    <tr>
+      <td>${idx + 1}</td>
+      <td>${it.desc || '-'}</td>
+      <td class="text-center">${it.qty || 1}</td>
+      <td class="text-right">$${(it.price || 0).toFixed(2)}</td>
+      <td class="text-right">$${((it.qty || 1) * (it.price || 0)).toFixed(2)}</td>
+    </tr>`).join('')}
+  </tbody>
+</table>
+
+<div class="summary">
+  <table class="summary-table">
+    <tr><td class="label">Exchange Rate 匯率</td><td class="value">1 JPY = HK$${rate}</td></tr>
+    <tr><td class="label">Total Cost 總成本</td><td class="value" style="color:#ffe66d">¥${totalCostJpy.toLocaleString()}</td></tr>
+    <tr><td class="label">Subtotal 小計</td><td class="value">$${subtotal.toFixed(2)}</td></tr>
+    <tr><td class="label">Profit 利潤</td><td class="value" style="color:#00d4aa">$${profit.toFixed(2)}</td></tr>
+    <tr class="total"><td>Total 總計</td><td>$${subtotal.toFixed(2)}</td></tr>
+  </table>
+</div>
+
+<div class="footer">
+  <p>Generated by 會計開單系統 | ${new Date().toLocaleString()}</p>
+</div>
+</body>
+</html>`;
+}
+
+function downloadInvoicePDF(id) {
+  const invoice = invoices.find(i => i.id === id);
+  if (!invoice) { alert('❌ 找不到發票'); return; }
+  
+  const html = generateInvoiceHTML(invoice);
+  const win = window.open('', '_blank');
+  if (!win) { alert('❌ 請允許彈出視窗'); return; }
+  win.document.write(html);
+  win.document.close();
+  win.onload = () => {
+    win.print();
+  };
+}
+
+async function sendInvoiceEmail(id) {
+  const invoice = invoices.find(i => i.id === id);
+  if (!invoice) { alert('❌ 找不到發票'); return; }
+  
+  const email = invoice.client_email;
+  if (!email) { alert('❌ 沒有電郵地址'); return; }
+  
+  const html = generateInvoiceHTML(invoice);
+  const win = window.open('', '_blank');
+  if (!win) { alert('❌ 請允許彈出視窗'); return; }
+  win.document.write(html);
+  win.document.close();
+  win.onload = () => {
+    if (confirm(`📧 確定發送發票到 ${email}？\n\n系統將打開打印視窗，請使用「另存為 PDF」保存後發送。`)) {
+      win.print();
+    }
+  };
+}
 
 // Records
 function renderRecords() {
