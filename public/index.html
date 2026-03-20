@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>💼 會計開單系統</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0f0f23;min-height:100vh;color:#fff}
+.header{background:#1a1a2e;padding:16px 24px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #333}
+.header h1{font-size:20px}
+.tabs{display:flex;gap:8px}
+.tab{padding:8px 16px;background:#252540;border:none;border-radius:8px;color:#888;font-size:14px;cursor:pointer}
+.tab.active{background:#00d4aa;color:#0f0f23;font-weight:600}
+.tab:hover:not(.active){background:#333;color:#fff}
+.container{max-width:1200px;margin:24px auto;padding:0 16px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px}
+.stat{background:#1a1a2e;border-radius:12px;padding:20px;text-align:center;border:1px solid #333}
+.stat .label{color:#888;font-size:13px}
+.stat .value{font-size:24px;font-weight:700;margin-top:6px}
+.stat.income .value{color:#00d4aa}
+.stat.expense .value{color:#ff6b6b}
+.stat.balance .value{color:#4ecdc4}
+.card{background:#1a1a2e;border-radius:16px;padding:20px;margin-bottom:16px;border:1px solid #333}
+.card h2{margin-bottom:16px;font-size:16px;color:#aaa}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px}
+.card-header h2{margin:0;font-size:16px;color:#aaa}
+.btn{padding:8px 16px;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:#00d4aa;color:#0f0f23}
+.btn-secondary{background:#333;color:#fff}
+.btn-danger{background:#ff6b6b;color:#fff}
+.btn-sm{padding:6px 10px;font-size:12px}
+.modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);justify-content:center;align-items:center;z-index:1000;padding:16px}
+.modal.active{display:flex}
+.modal-content{background:#1a1a2e;border-radius:16px;padding:24px;width:100%;max-width:600px;max-height:90vh;overflow-y:auto}
+.modal-content h2{margin-bottom:20px;font-size:18px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-group{margin-bottom:12px}
+.form-group label{display:block;margin-bottom:6px;color:#888;font-size:13px}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:10px;border:1px solid #333;border-radius:8px;background:#0f0f23;color:#fff;font-size:14px}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:#00d4aa}
+.btn-row{display:flex;gap:10px;margin-top:20px;justify-content:flex-end}
+.list{display:grid;gap:10px}
+.list-item{background:#252540;padding:14px 16px;border-radius:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.list-item:hover{background:#2a2a45}
+.list-item-info h3{font-size:15px;margin-bottom:4px}
+.list-item-info p{color:#888;font-size:12px}
+.list-item-actions{display:flex;gap:8px;align-items:center}
+.status{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.status.paid{background:#00d4aa22;color:#00d4aa}
+.status.unpaid{background:#ff6b6b22;color:#ff6b6b}
+.empty{text-align:center;padding:40px;color:#555;font-size:14px}
+.item-row{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center}
+.item-row input{padding:8px;font-size:13px;border:1px solid #333;border-radius:6px;background:#0f0f23;color:#fff}
+.item-row .cost-jpy{color:#ffe66d!important;border-color:#ffe66d55!important}
+.item-row .profit-hkd{color:#00d4aa!important;border-style:dashed!important;border-color:#00d4aa44!important;font-weight:600}
+.item-row .margin-pct{color:#4ecdc4!important;border-color:#4ecdc4!important}
+.item-row input[readonly]{background:#1a1a2e}
+.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}
+.summary-card{background:#0f0f23;border-radius:8px;padding:10px;text-align:center}
+.summary-card .sc-label{color:#888;font-size:11px}
+.summary-card .sc-value{font-size:15px;font-weight:700;margin-top:4px}
+.customer-suggestions{position:absolute;top:100%;left:0;right:0;background:#252540;border:1px solid #00d4aa;border-radius:8px;margin-top:4px;z-index:10;max-height:150px;overflow-y:auto;display:none}
+.customer-suggestions.show{display:block}
+.suggestion-item{padding:8px 12px;cursor:pointer;font-size:13px}
+.suggestion-item:hover{background:#2a2a45}
+.search-wrap{position:relative}
+table{width:100%;border-collapse:collapse;margin-top:12px}
+th{text-align:left;padding:10px;background:#252540;color:#888;font-size:12px;font-weight:600}
+td{padding:10px;border-bottom:1px solid #252540;font-size:13px}
+tr:hover{background:#1f1f35}
+.search-input{padding:8px 12px;border-radius:8px;border:1px solid #333;background:#0f0f23;color:#fff;font-size:13px;min-width:200px}
+@media(max-width:600px){
+.stats{grid-template-columns:1fr 1fr}
+.form-row{grid-template-columns:1fr}
+.item-row{grid-template-columns:1fr 1fr}
+.summary-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+<div class="header">
+<h1>💼 會計開單系統</h1>
+<div class="tabs">
+<button class="tab active" data-view="dashboard">📊 總覽</button>
+<button class="tab" data-view="customers">👥 客戶</button>
+<button class="tab" data-view="invoices">📄 發票</button>
+<button class="tab" data-view="records">💰 收支</button>
+</div>
+</div>
+<div class="container">
+<div id="view-dashboard"></div>
+<div id="view-customers" style="display:none"></div>
+<div id="view-invoices" style="display:none"></div>
+<div id="view-records" style="display:none"></div>
+</div>
+
+<!-- Customer Modal -->
+<div class="modal" id="modal-customer">
+<div class="modal-content">
+<h2 id="customer-modal-title">👤 新增客戶</h2>
+<input type="hidden" id="edit-customer-id">
+<div class="form-row">
+<div class="form-group"><label>名稱 *</label><input type="text" id="cust-name" placeholder="客戶名稱"></div>
+<div class="form-group"><label>電話</label><input type="tel" id="cust-phone" placeholder="+852 9123 4567"></div>
+</div>
+<div class="form-row">
+<div class="form-group"><label>電郵</label><input type="email" id="cust-email" placeholder="client@example.com"></div>
+<div class="form-group"><label>公司</label><input type="text" id="cust-company" placeholder="公司名稱"></div>
+</div>
+<div class="form-group"><label>地址</label><textarea id="cust-address" rows="2" placeholder="客戶地址"></textarea></div>
+<div class="form-group"><label>備註</label><textarea id="cust-notes" rows="2" placeholder="其他備註..."></textarea></div>
+<div class="btn-row">
+<button class="btn btn-secondary" onclick="closeModal('customer')">取消</button>
+<button class="btn btn-primary" onclick="saveCustomer()">儲存</button>
+</div>
+</div>
+</div>
+
+<!-- Invoice Modal -->
+<div class="modal" id="modal-invoice">
+<div class="modal-content">
+<h2>📄 新增發票</h2>
+<div class="form-row">
+<div class="form-group" style="position:relative">
+<label>客戶名稱 *</label>
+<div class="search-wrap">
+<input type="text" id="inv-client" placeholder="搜尋或輸入客戶" oninput="showCustomerSuggestions(this.value)">
+<div class="customer-suggestions" id="inv-client-suggestions"></div>
+</div>
+</div>
+<div class="form-group"><label>發票編號</label><input type="text" id="inv-no" readonly></div>
+</div>
+<div class="form-row">
+<div class="form-group"><label>電郵</label><input type="email" id="inv-email" placeholder="client@example.com"></div>
+<div class="form-group"><label>日期</label><input type="date" id="inv-date"></div>
+</div>
+<div class="form-group"><label>地址</label><textarea id="inv-address" rows="2"></textarea></div>
+<div style="margin-top:12px">
+<div class="form-row" style="margin-bottom:12px">
+<div class="form-group" style="margin-bottom:0">
+<label style="color:#00d4aa;font-weight:600">統一利潤率 (%)</label>
+<input type="number" id="inv-margin" placeholder="例：15" step="0.1" value="10" style="border-color:#00d4aa" oninput="applyUnifiedMargin()">
+</div>
+<div class="form-group" style="margin-bottom:0">
+<label style="color:#888">匯率 (1 JPY = ? HKD)</label>
+<input type="number" id="inv-rate" placeholder="0.052" step="0.0001" value="0.052" style="border-color:#4ecdc4" oninput="applyUnifiedMargin()">
+</div>
+</div>
+<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:6px;margin-bottom:8px;font-size:11px;color:#666;font-weight:600">
+<div>項目描述</div><div>數量</div><div>成本 (JPY)</div><div>售價 (HKD)</div><div></div>
+</div>
+<div id="inv-items"></div>
+<button class="btn btn-sm" style="background:#333;margin-top:8px" onclick="addInvItem()">+ 加項目</button>
+</div>
+<div class="summary-grid">
+<div class="summary-card"><div class="sc-label">總銷售</div><div class="sc-value" id="inv-total-sale">$0</div></div>
+<div class="summary-card"><div class="sc-label">總成本</div><div class="sc-value" style="color:#ffe66d" id="inv-total-cost">¥0</div></div>
+<div class="summary-card"><div class="sc-label">總利潤</div><div class="sc-value" style="color:#00d4aa" id="inv-total-profit">$0</div></div>
+<div class="summary-card"><div class="sc-label">利潤率</div><div class="sc-value" style="color:#4ecdc4" id="inv-total-margin">0%</div></div>
+</div>
+<div class="btn-row">
+<button class="btn btn-secondary" onclick="closeModal('invoice')">取消</button>
+<button class="btn btn-primary" onclick="saveInvoice()">儲存</button>
+</div>
+</div>
+</div>
+
+<!-- Record Modal -->
+<div class="modal" id="modal-record">
+<div class="modal-content">
+<h2>💰 新增收支記錄</h2>
+<div class="form-row">
+<div class="form-group"><label>日期</label><input type="date" id="rec-date"></div>
+<div class="form-group"><label>類型</label><select id="rec-type"><option value="income">收入</option><option value="expense">支出</option></select></div>
+</div>
+<div class="form-group"><label>項目</label><input type="text" id="rec-desc" placeholder="例：客戶付款"></div>
+<div class="form-group"><label>金額 ($)</label><input type="number" id="rec-amount" placeholder="0"></div>
+<div class="btn-row">
+<button class="btn btn-secondary" onclick="closeModal('record')">取消</button>
+<button class="btn btn-primary" onclick="saveRecord()">儲存</button>
+</div>
+</div>
+</div>
+
+<script>
+const API = '';
+let customers = [], invoices = [], records = [], stats = {};
+let editingCustomerId = null;
+let invItems = [];
+
+async function api(path, options = {}) {
+  const res = await fetch(API + path, options);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function loadData() {
+  [customers, invoices, records, stats] = await Promise.all([
+    api('/api/customers'),
+    api('/api/invoices'),
+    api('/api/records'),
+    api('/api/stats')
+  ]);
+}
+
+function showView(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.tab[data-view="${name}"]`).classList.add('active');
+  document.querySelectorAll('[id^="view-"]').forEach(v => v.style.display = 'none');
+  document.getElementById(`view-${name}`).style.display = 'block';
+  if (name === 'dashboard') renderDashboard();
+  else if (name === 'customers') renderCustomers();
+  else if (name === 'invoices') renderInvoices();
+  else if (name === 'records') renderRecords();
+}
+
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => showView(t.dataset.view)));
+
+function openModal(name) { document.getElementById(`modal-${name}`).classList.add('active'); }
+function closeModal(name) { document.getElementById(`modal-${name}`).classList.remove('active'); }
+document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); }));
+
+// Dashboard
+function renderDashboard() {
+  const dv = document.getElementById('view-dashboard');
+  const unpaid = invoices.filter(i => !i.paid);
+  dv.innerHTML = `
+    <div class="stats">
+      <div class="stat income"><div class="label">總收入</div><div class="value">$${stats.income?.toLocaleString() || 0}</div></div>
+      <div class="stat expense"><div class="label">總支出</div><div class="value">$${stats.expense?.toLocaleString() || 0}</div></div>
+      <div class="stat balance"><div class="label">結餘</div><div class="value">$${(stats.balance || 0).toLocaleString()}</div></div>
+    </div>
+    <div class="card">
+      <h2>📄 未付款發票 (${unpaid.length})</h2>
+      ${unpaid.length ? unpaid.map(i => `
+        <div class="list-item">
+          <div class="list-item-info">
+            <h3>${i.client} - ${i.no}</h3>
+            <p>${i.date} | ${i.items?.length || 0} 項目</p>
+          </div>
+          <div class="list-item-actions">
+            <span class="status unpaid">未付 $${(i.items?.reduce((s,it) => s + it.qty * it.price, 0) || 0).toLocaleString()}</span>
+            <button class="btn btn-primary btn-sm" onclick="markInvoicePaid('${i.id}')">設為已付</button>
+          </div>
+        </div>`).join('') : '<div class="empty">沒有未付款發票 🎉</div>'}
+    </div>`;
+}
+
+// Customers
+function renderCustomers() {
+  const cv = document.getElementById('view-customers');
+  cv.innerHTML = `
+    <div class="stats">
+      <div class="stat"><div class="label">總客戶數</div><div class="value" style="color:#00d4aa">${customers.length}</div></div>
+      <div class="stat"><div class="label">有發票的客戶</div><div class="value" style="color:#4ecdc4">${stats.customersWithInvoices || 0}</div></div>
+      <div class="stat"><div class="label">總銷售額</div><div class="value" style="color:#00d4aa">$${(stats.totalCustomerSales || 0).toLocaleString()}</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <h2>客戶列表</h2>
+        <div style="display:flex;gap:8px">
+          <input type="text" class="search-input" placeholder="🔍 搜尋客戶..." oninput="filterCustomers(this.value)">
+          <button class="btn btn-primary" onclick="openNewCustomer()">+ 新增客戶</button>
+        </div>
+      </div>
+      <div id="customers-list"></div>
+    </div>`;
+  renderCustomersList(customers);
+}
+
+function renderCustomersList(list) {
+  const el = document.getElementById('customers-list');
+  if (!list.length) { el.innerHTML = '<div class="empty">暫時沒有客戶</div>'; return; }
+  el.innerHTML = list.map(c => `
+    <div class="list-item">
+      <div class="list-item-info">
+        <h3>${c.name}</h3>
+        <p>${c.company || ''} ${c.phone ? '| ' + c.phone : ''} ${c.email ? '| ' + c.email : ''}</p>
+      </div>
+      <div class="list-item-actions">
+        <button class="btn btn-primary btn-sm" onclick="quickInvoice('${c.name}','${c.email || ''}','${c.address || ''}')">開單</button>
+        <button class="btn btn-secondary btn-sm" onclick="editCustomer('${c.id}')">編輯</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteCustomer('${c.id}')">刪除</button>
+      </div>
+    </div>`).join('');
+}
+
+function filterCustomers(q) {
+  const filtered = customers.filter(c => c.name.toLowerCase().includes(q.toLowerCase()) || (c.company || '').toLowerCase().includes(q.toLowerCase()));
+  renderCustomersList(filtered);
+}
+
+function openNewCustomer() { editingCustomerId = null; document.getElementById('customer-modal-title').textContent = '👤 新增客戶'; ['name','phone','email','company','address','notes'].forEach(f => document.getElementById('cust-' + f).value = ''); openModal('customer'); }
+function editCustomer(id) {
+  const c = customers.find(x => x.id === id); if (!c) return;
+  editingCustomerId = id; document.getElementById('customer-modal-title').textContent = '✏️ 編輯客戶';
+  ['name','phone','email','company','address','notes'].forEach(f => document.getElementById('cust-' + f).value = c[f] || ''); openModal('customer');
+}
+
+async function saveCustomer() {
+  const name = document.getElementById('cust-name').value.trim();
+  if (!name) { alert('請輸入客戶名稱'); return; }
+  const c = { id: editingCustomerId || 'CUST-' + Date.now(), name, phone: document.getElementById('cust-phone').value.trim(), email: document.getElementById('cust-email').value.trim(), company: document.getElementById('cust-company').value.trim(), address: document.getElementById('cust-address').value.trim(), notes: document.getElementById('cust-notes').value.trim() };
+  if (editingCustomerId) { await api('/api/customers/' + editingCustomerId, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(c) }); }
+  else { await api('/api/customers', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(c) }); }
+  closeModal('customer'); await loadData(); renderCustomers();
+}
+
+async function deleteCustomer(id) { if (!confirm('確定刪除這個客戶？')) return; await api('/api/customers/' + id, { method: 'DELETE' }); await loadData(); renderCustomers(); }
+
+function showCustomerSuggestions(val) {
+  const box = document.getElementById('inv-client-suggestions');
+  if (!val || val.length < 1) { box.classList.remove('show'); return; }
+  const matches = customers.filter(c => c.name.toLowerCase().includes(val.toLowerCase())).slice(0, 5);
+  if (!matches.length) { box.classList.remove('show'); return; }
+  box.innerHTML = matches.map(c => `<div class="suggestion-item" onclick="selectCustomer('${c.name.replace(/'/g,"\\'")}','${(c.email||'').replace(/'/g,"\\'")}','${(c.address||'').replace(/'/g,"\\'")}')">${c.name} <small>${c.company||''}</small></div>`).join('');
+  box.classList.add('show');
+}
+function selectCustomer(name, email, address) { document.getElementById('inv-client').value = name; document.getElementById('inv-email').value = email; document.getElementById('inv-address').value = address; document.getElementById('inv-client-suggestions').classList.remove('show'); }
+document.addEventListener('click', e => { if (!e.target.closest('.search-wrap')) document.getElementById('inv-client-suggestions').classList.remove('show'); });
+
+// Invoices
+function renderInvoices() {
+  const iv = document.getElementById('view-invoices');
+  iv.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <h2>發票列表 (${invoices.length})</h2>
+        <button class="btn btn-primary" onclick="openNewInvoice()">+ 新增發票</button>
+      </div>
+      ${invoices.length ? invoices.map(i => {
+        const total = i.items?.reduce((s,it) => s + it.qty * it.price, 0) || 0;
+        return `<div class="list-item">
+          <div class="list-item-info">
+            <h3>${i.client} - ${i.no}</h3>
+            <p>${i.date} | ${i.items?.length || 0} 項目 | $${total.toLocaleString()}</p>
+          </div>
+          <div class="list-item-actions">
+            <span class="status ${i.paid ? 'paid' : 'unpaid'}">${i.paid ? '已付' : '未付'}</span>
+            ${i.paid ? '' : `<button class="btn btn-primary btn-sm" onclick="markInvoicePaid('${i.id}')">已收費</button>`}
+            <button class="btn btn-danger btn-sm" onclick="deleteInvoice('${i.id}')">刪除</button>
+          </div>
+        </div>`;}).join('') : '<div class="empty">暫時沒有發票</div>'}
+    </div>`;
+}
+
+function openNewInvoice() {
+  invItems = [{ desc: '', qty: 1, costJpy: 0, price: 0 }];
+  document.getElementById('inv-no').value = 'INV-' + Date.now().toString().slice(-6);
+  ['client','email','address'].forEach(f => document.getElementById('inv-' + f).value = '');
+  document.getElementById('inv-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('inv-margin').value = localStorage.getItem('lastMargin') || '10';
+  document.getElementById('inv-rate').value = localStorage.getItem('lastRate') || '0.052';
+  renderInvItems(); openModal('invoice');
+}
+
+function quickInvoice(name, email, address) { openNewInvoice(); document.getElementById('inv-client').value = name; document.getElementById('inv-email').value = email; document.getElementById('inv-address').value = address; }
+
+function addInvItem() { invItems.push({ desc: '', qty: 1, costJpy: 0, margin: 10, price: 0 }); renderInvItems(); }
+
+function renderInvItems() {
+  const el = document.getElementById('inv-items');
+  const unifiedMargin = parseFloat(document.getElementById('inv-margin').value) || 0;
+  const unifiedRate = parseFloat(document.getElementById('inv-rate').value) || 0.052;
+  el.innerHTML = invItems.map((it, idx) => {
+    const costTotal = (it.costJpy || 0) * (it.qty || 1) * unifiedRate;
+    let price = 0;
+    if (costTotal > 0 && unifiedMargin < 100) { price = costTotal / (1 - unifiedMargin / 100) / (it.qty || 1); }
+    return `<div class="item-row">
+      <input type="text" placeholder="項目描述" value="${it.desc || ''}" oninput="updateInvItem(${idx}, 'desc', this.value)">
+      <input type="number" placeholder="數量" value="${it.qty || 1}" style="width:60px" oninput="updateInvItem(${idx}, 'qty', this.value)">
+      <input type="number" placeholder="成本 (JPY)" class="cost-jpy" value="${it.costJpy || ''}" oninput="updateInvItem(${idx}, 'costJpy', this.value)">
+      <input type="text" placeholder="$0" class="profit-hkd" value="${price > 0 ? '$' + price.toFixed(2) : ''}" readonly>
+      <button class="btn btn-danger btn-sm" onclick="removeInvItem(${idx})">✕</button>
+    </div>`;
+  }).join('');
+  calcInvTotals();
+}
+
+function applyUnifiedMargin() {
+  renderInvItems();
+}
+
+function updateInvItem(idx, field, val) {
+  invItems[idx][field] = field === 'desc' ? val : parseFloat(val) || 0;
+  const it = invItems[idx];
+  const rate = parseFloat(document.getElementById('inv-rate').value) || 0.052;
+  const margin = parseFloat(document.getElementById('inv-margin').value) || 0;
+  const costTotal = (it.costJpy || 0) * (it.qty || 1) * rate;
+  if (costTotal > 0 && margin < 100) { invItems[idx].price = costTotal / (1 - margin / 100) / (it.qty || 1); }
+  else { invItems[idx].price = 0; }
+  renderInvItems();
+}
+
+function removeInvItem(idx) { invItems.splice(idx, 1); renderInvItems(); }
+
+function calcInvTotals() {
+  const rate = parseFloat(document.getElementById('inv-rate').value) || 0.052;
+  const margin = parseFloat(document.getElementById('inv-margin').value) || 0;
+  let totalSale = 0, totalCostJpy = 0, totalProfit = 0;
+  invItems.forEach(it => {
+    const qty = it.qty || 1;
+    const costJpy = it.costJpy || 0;
+    const costTotal = costJpy * qty * rate;
+    let price = 0;
+    if (costTotal > 0 && margin < 100) { price = costTotal / (1 - margin / 100) / qty; }
+    const sale = qty * price;
+    totalSale += sale; totalCostJpy += costJpy * qty; totalProfit += sale - costTotal;
+  });
+  const actualMargin = totalSale > 0 ? (totalProfit / totalSale * 100).toFixed(1) : 0;
+  document.getElementById('inv-total-sale').textContent = '$' + totalSale.toLocaleString();
+  document.getElementById('inv-total-cost').textContent = '¥' + totalCostJpy.toLocaleString();
+  document.getElementById('inv-total-profit').textContent = '$' + totalProfit.toFixed(2);
+  document.getElementById('inv-total-margin').textContent = actualMargin + '%';
+}
+
+async function saveInvoice() {
+  const client = document.getElementById('inv-client').value.trim();
+  if (!client) { alert('請輸入客戶名稱'); return; }
+  if (!invItems.length || !invItems.some(it => it.desc && it.price > 0)) { alert('請輸入最少一項'); return; }
+  const margin = parseFloat(document.getElementById('inv-margin').value) || 0;
+  const rate = parseFloat(document.getElementById('inv-rate').value) || 0.052;
+  const validItems = invItems.filter(it => it.desc && it.price > 0);
+  const inv = { id: 'INV-' + Date.now(), no: document.getElementById('inv-no').value, client, client_email: document.getElementById('inv-email').value.trim(), client_address: document.getElementById('inv-address').value.trim(), date: document.getElementById('inv-date').value, items: validItems, paid: false, margin, exchange_rate: rate };
+  localStorage.setItem('lastMargin', margin);
+  localStorage.setItem('lastRate', rate);
+  await api('/api/invoices', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(inv) });
+  closeModal('invoice'); await loadData(); renderInvoices();
+}
+
+async function markInvoicePaid(id) { await api('/api/invoices/' + id + '/mark-paid', { method: 'POST' }); await loadData(); renderDashboard(); renderInvoices(); }
+async function deleteInvoice(id) { if (!confirm('確定刪除這張發票？')) return; await api('/api/invoices/' + id, { method: 'DELETE' }); await loadData(); renderInvoices(); }
+
+// Records
+function renderRecords() {
+  const rv = document.getElementById('view-records');
+  rv.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <h2>收支記錄 (${records.length})</h2>
+        <button class="btn btn-primary" onclick="openNewRecord()">+ 新增記錄</button>
+      </div>
+      <table>
+        <thead><tr><th>日期</th><th>項目</th><th>類型</th><th>金額</th><th></th></tr></thead>
+        <tbody>${records.map(r => `<tr><td>${r.date}</td><td>${r.desc}</td><td style="color:${r.type === 'income' ? '#00d4aa' : '#ff6b6b'}">${r.type === 'income' ? '收入' : '支出'}</td><td style="color:${r.type === 'income' ? '#00d4aa' : '#ff6b6b'}>$${Number(r.amount).toLocaleString()}</td><td><button class="btn btn-danger btn-sm" onclick="deleteRecord('${r.id}')">刪除</button></td></tr>`).join('')}</tbody>
+      </table>
+      ${records.length === 0 ? '<div class="empty">暫時沒有記錄</div>' : ''}
+    </div>`;
+}
+
+function openNewRecord() { document.getElementById('rec-date').value = new Date().toISOString().split('T')[0]; document.getElementById('rec-desc').value = ''; document.getElementById('rec-type').value = 'income'; document.getElementById('rec-amount').value = ''; openModal('record'); }
+
+async function saveRecord() {
+  const desc = document.getElementById('rec-desc').value.trim();
+  const amount = parseFloat(document.getElementById('rec-amount').value);
+  if (!desc || !amount) { alert('請填寫所有欄位'); return; }
+  await api('/api/records', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id: 'REC-' + Date.now(), date: document.getElementById('rec-date').value, desc, type: document.getElementById('rec-type').value, amount }) });
+  closeModal('record'); await loadData(); renderRecords();
+}
+
+async function deleteRecord(id) { if (!confirm('確定刪除？')) return; await api('/api/records/' + id, { method: 'DELETE' }); await loadData(); renderRecords(); }
+
+// Init
+loadData().then(() => showView('dashboard'));
+</script>
+</body>
+</html>
