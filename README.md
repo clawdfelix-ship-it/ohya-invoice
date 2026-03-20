@@ -17,7 +17,7 @@ npm start
 
 然後開瀏覽器去 http://localhost:3000
 
-## 部署到 Railway (免費)
+## 部署到 Railway (免費free)
 
 1. 將呢個 folder push 去 GitHub
 2. 去 https://railway.app 開個免費 account
