@@ -233,11 +233,25 @@ SKU-001,產品A,電子,1000,50,範例備註
 </div>
 </div>
 
+<!-- SheetJS for Excel import -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script>
 const API = '';
 let customers = [], invoices = [], records = [], products = [], stats = {};
 let editingCustomerId = null;
 let invItems = [];
+
+// 确保 DOM 加载完成后绑定事件
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('✅ App initialized');
+  // 重新绑定 Tab 点击事件
+  document.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', function() {
+      console.log('🖱️ Tab clicked:', this.dataset.view);
+      showView(this.dataset.view);
+    });
+  });
+});
 
 async function api(path, options = {}) {
   const res = await fetch(API + path, options);
@@ -266,7 +280,7 @@ function showView(name) {
   else if (name === 'products') renderProducts();
 }
 
-document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => showView(t.dataset.view)));
+// Tab 点击事件已在 DOMContentLoaded 中绑定，避免重复绑定
 
 function openModal(name) { document.getElementById(`modal-${name}`).classList.add('active'); }
 function closeModal(name) { document.getElementById(`modal-${name}`).classList.remove('active'); }
@@ -611,8 +625,23 @@ async function doExcelImport() {
 }
 async function deleteRecord(id) { if (!confirm('確定刪除？')) return; await api('/api/records/' + id, { method: 'DELETE' }); await loadData(); renderRecords(); }
 
-// Init
-loadData().then(() => showView('dashboard'));
+// Init - 确保在 DOM 加载后执行
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+
+function init() {
+  console.log('🚀 Initializing app...');
+  loadData().then(() => {
+    console.log('📊 Data loaded:', { customers: customers.length, invoices: invoices.length, products: products.length });
+    showView('dashboard');
+  }).catch(err => {
+    console.error('❌ Failed to load data:', err);
+    alert('加载数据失败：' + err.message);
+  });
+}
 </script>
 </body>
 </html>
