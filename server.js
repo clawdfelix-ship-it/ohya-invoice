@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const { customerOps, invoiceOps, recordOps, settingsOps } = require('./database');
+const { customerOps, invoiceOps, recordOps, settingsOps, productOps } = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -136,6 +136,63 @@ app.post('/api/records', (req, res) => {
 app.delete('/api/records/:id', (req, res) => {
   try {
     recordOps.delete(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============ PRODUCTS API ============
+app.get('/api/products', (req, res) => {
+  try {
+    const { q } = req.query;
+    const products = q ? productOps.search(q) : productOps.getAll();
+    res.json(products);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/products/:id', (req, res) => {
+  try {
+    const product = productOps.getById(req.params.id);
+    if (!product) return res.status(404).json({ error: 'Not found' });
+    res.json(product);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/products', (req, res) => {
+  try {
+    const product = productOps.create(req.body);
+    res.json(product);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/products/bulk', (req, res) => {
+  try {
+    const products = req.body.products || [];
+    const result = productOps.bulkCreate(products);
+    res.json({ success: true, count: result.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/products/:id', (req, res) => {
+  try {
+    res.json(productOps.update({ ...req.body, id: req.params.id }));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/products/:id', (req, res) => {
+  try {
+    productOps.delete(req.params.id);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

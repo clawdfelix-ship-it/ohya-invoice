@@ -86,6 +86,7 @@ tr:hover{background:#1f1f35}
 <button class="tab" data-view="customers">👥 客戶</button>
 <button class="tab" data-view="invoices">📄 發票</button>
 <button class="tab" data-view="records">💰 收支</button>
+<button class="tab" data-view="products">📦 產品</button>
 </div>
 </div>
 <div class="container">
@@ -93,6 +94,7 @@ tr:hover{background:#1f1f35}
 <div id="view-customers" style="display:none"></div>
 <div id="view-invoices" style="display:none"></div>
 <div id="view-records" style="display:none"></div>
+<div id="view-products" style="display:none"></div>
 </div>
 
 <!-- Customer Modal -->
@@ -167,6 +169,54 @@ tr:hover{background:#1f1f35}
 </div>
 
 <!-- Record Modal -->
+<!-- Product Modal -->
+<div class="modal" id="modal-product">
+<div class="modal-content">
+<h2 id="product-modal-title">📦 新增產品</h2>
+<input type="hidden" id="edit-product-id">
+<div class="form-row">
+<div class="form-group"><label>產品名稱 *</label><input type="text" id="prod-name" placeholder="產品名稱"></div>
+<div class="form-group"><label>SKU</label><input type="text" id="prod-sku" placeholder="SKU-001"></div>
+<div class="form-group"><label>JAN</label><input type="text" id="prod-jan" placeholder="JAN碼"></div>
+</div>
+<div class="form-row">
+<div class="form-group"><label>類別</label><input type="text" id="prod-category" placeholder="例如：電子產品"></div>
+<div class="form-group"><label>成本 (JPY)</label><input type="number" id="prod-cost" placeholder="0"></div>
+</div>
+<div class="form-row">
+<div class="form-group"><label>建議售價 (HKD)</label><input type="number" id="prod-price" placeholder="0"></div>
+<div class="form-group"><label>備註</label><input type="text" id="prod-notes" placeholder="其他備註"></div>
+</div>
+<!-- Excel Import Modal -->
+<div class="modal" id="modal-excel">
+<div class="modal-content">
+<h2>📥 Excel 上傳</h2>
+<p style="color:#888;font-size:13px;margin-bottom:16px">下載範本，填寫資料，然後上傳。支持 .xlsx, .xls, .csv 格式。</p>
+<div style="margin-bottom:16px">
+<a href="data:text/csv;charset=utf-8,SKU,產品名稱,類別,成本(JPY),建議售價(HKD),備註
+SKU-001,產品A,電子,1000,50,範例備註
+" download="產品範本.csv" style="color:#00d4aa;font-size:13px">📄 下載 CSV 範本</a>
+</div>
+<input type="file" id="excel-file" accept=".xlsx,.xls,.csv" style="margin-bottom:16px">
+<div id="excel-preview" style="display:none;margin-bottom:16px">
+<h4 style="color:#888;margin-bottom:8px">預覽 (前5行):</h4>
+<table style="width:100%;font-size:12px;border-collapse:collapse"><thead id="excel-preview-head"></thead><tbody id="excel-preview-body"></tbody></table>
+<p style="color:#00d4aa;font-size:12px;margin-top:8px" id="excel-count"></p>
+</div>
+<div class="btn-row">
+<button class="btn btn-secondary" onclick="closeModal('excel')">取消</button>
+<button class="btn btn-primary" id="btn-import-excel" onclick="doExcelImport()" disabled>確認匯入</button>
+</div>
+</div>
+</div>
+
+<div class="btn-row">
+<button class="btn btn-secondary" onclick="closeModal('product')">取消</button>
+<button class="btn btn-primary" onclick="saveProduct()">儲存</button>
+</div>
+</div>
+</div>
+
 <div class="modal" id="modal-record">
 <div class="modal-content">
 <h2>💰 新增收支記錄</h2>
@@ -185,7 +235,7 @@ tr:hover{background:#1f1f35}
 
 <script>
 const API = '';
-let customers = [], invoices = [], records = [], stats = {};
+let customers = [], invoices = [], records = [], products = [], stats = {};
 let editingCustomerId = null;
 let invItems = [];
 
@@ -213,6 +263,7 @@ function showView(name) {
   else if (name === 'customers') renderCustomers();
   else if (name === 'invoices') renderInvoices();
   else if (name === 'records') renderRecords();
+  else if (name === 'products') renderProducts();
 }
 
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => showView(t.dataset.view)));
@@ -459,6 +510,105 @@ async function saveRecord() {
   closeModal('record'); await loadData(); renderRecords();
 }
 
+
+// Products
+function renderProducts() {
+  const pv = document.getElementById('view-products');
+  pv.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <h2>📦 產品列表 (${products.length})</h2>
+        <div style="display:flex;gap:8px">
+          <input type="text" class="search-input" placeholder="🔍 搜尋產品..." oninput="filterProducts(this.value)">
+          <button class="btn btn-secondary" onclick="openExcelModal()">📥 Excel上傳</button>
+          <button class="btn btn-primary" onclick="openNewProduct()">+ 新增產品</button>
+        </div>
+      </div>
+      ${products.length ? `<table style="margin-top:12px"><thead><tr><th>JAN</th><th>SKU</th><th>產品名稱</th><th>類別</th><th>成本 (JPY)</th><th>建議售價 (HKD)</th><th></th></tr></thead><tbody>${products.map(p => `<tr><td>${p.jan || '-'}</td><td>${p.sku || '-'}</td><td>${p.name}</td><td>${p.category || '-'}</td><td style="color:#ffe66d">¥${(p.cost_jpy || 0).toLocaleString()}</td><td style="color:#00d4aa">$${(p.suggested_price_hkd || 0).toLocaleString()}</td><td><button class="btn btn-sm" style="background:#333" onclick="editProduct('${p.id}'")>編輯</button> <button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.id}'")>刪除</button></td></tr>`).join('')}</tbody></table>` : '<div class="empty">暫時沒有產品 <br><br><a href="data:text/csv;charset=utf-8,SKU,產品名稱,類別,成本(JPY),建議售價(HKD),備註\nSKU-001,產品A,電子,1000,50,範例" download="產品範本.csv" style="color:#00d4aa">📄 下載 CSV 範本</a></div>'}
+    </div>`;
+}
+
+function filterProducts(q) {
+  const filtered = products.filter(p => (p.name || '').toLowerCase().includes(q.toLowerCase()) || (p.sku || '').toLowerCase().includes(q.toLowerCase()) || (p.category || '').toLowerCase().includes(q.toLowerCase()));
+  const pv = document.getElementById('view-products');
+  pv.innerHTML = filtered.length ? filtered.map(p => `<div class="list-item"><div class="list-item-info"><h3>${p.name}</h3><p>JAN: ${p.jan || '-'} | SKU: ${p.sku || '-'} | ${p.category || '無類別'}</p></div><div style="display:flex;gap:8px;align-items:center"><span style="color:#ffe66d">¥${(p.cost_jpy||0).toLocaleString()}</span><span style="color:#00d4aa">$${(p.suggested_price_hkd||0).toLocaleString()}</span><button class="btn btn-sm" style="background:#333" onclick="editProduct('${p.id}'")>編輯</button><button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.id}'")>刪除</button></div></div>`).join('') : '<div class="empty">找不到產品</div>';
+}
+
+function openNewProduct() {
+  document.getElementById('product-modal-title').textContent = '📦 新增產品';
+  document.getElementById('edit-product-id').value = ';
+  ['name','sku','jan','category','cost','price','notes'].forEach(f => document.getElementById('prod-' + f).value = ');
+  openModal('product');
+}
+
+function editProduct(id) {
+  const p = products.find(x => x.id === id); if (!p) return;
+  document.getElementById('product-modal-title').textContent = '✏️ 編輯產品';
+  document.getElementById('edit-product-id').value = id;
+  document.getElementById('prod-name').value = p.name || ';
+  document.getElementById('prod-sku').value = p.sku || ';
+  document.getElementById('prod-category').value = p.category || ';
+  document.getElementById('prod-cost').value = p.cost_jpy || 0;
+  document.getElementById('prod-price').value = p.suggested_price_hkd || 0;
+  document.getElementById('prod-notes').value = p.notes || ';
+  openModal('product');
+}
+
+async function saveProduct() {
+  const name = document.getElementById('prod-name').value.trim();
+  if (!name) { alert('請輸入產品名稱'); return; }
+  const id = document.getElementById('edit-product-id').value || 'PROD-' + Date.now();
+  const p = { id, name, sku: document.getElementById('prod-sku').value.trim(), jan: document.getElementById('prod-jan').value.trim(), category: document.getElementById('prod-category').value.trim(), cost_jpy: parseFloat(document.getElementById('prod-cost').value) || 0, suggested_price_hkd: parseFloat(document.getElementById('prod-price').value) || 0, notes: document.getElementById('prod-notes').value.trim() };
+  if (document.getElementById('edit-product-id').value) { await api('/api/products/' + id, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(p) }); }
+  else { await api('/api/products', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(p) }); }
+  closeModal('product'); await loadData(); renderProducts();
+}
+
+async function deleteProduct(id) { if (!confirm('確定刪除這個產品？')) return; await api('/api/products/' + id, { method: 'DELETE' }); await loadData(); renderProducts(); }
+
+function openExcelModal() { document.getElementById('excel-file').value = ''; document.getElementById('excel-preview').style.display = 'none'; document.getElementById('btn-import-excel').disabled = true; openModal('excel'); }
+
+let excelData = [];
+document.getElementById('excel-file').addEventListener('change', function(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const data = new Uint8Array(ev.target.result);
+      const wb = XLSX.read(data, {type: 'array'});
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const json = XLSX.utils.sheet_to_json(ws, {header:1});
+      if (json.length < 2) { alert('Excel 檔案沒有資料'); return; }
+      const headers = json[0].map(h => String(h).trim());
+      const required = ['產品名稱'];
+      const nameIdx = headers.findIndex(h => h.includes('ITEM NAME') || h.includes('產品名稱'));
+      if (nameIdx < 0) { alert('找不到「產品名稱」欄位，請使用範本格式'); return; }
+      excelData = json.slice(1).filter(row => row[nameIdx]).map(row => ({
+        id: 'PROD-' + Date.now() + '-' + Math.random().toString(36).substr(2,9),
+        sku: String(row[headers.findIndex(h => h.includes('SKU'))] || '').trim(),
+        jan: String(row[headers.findIndex(h => h.includes('JAN'))] || '').trim(),,
+        name: String(row[nameIdx] || '').trim(),
+        category: String(row[headers.findIndex(h => h.includes('MANUFACTURER'))] || row[headers.findIndex(h => h.includes('廠商'))] || '').trim(),,
+        cost_jpy: parseFloat(row[headers.findIndex(h => h.includes('PRICE') || h.includes('成本'))] || 0) || 0,
+        suggested_price_hkd: parseFloat(row[headers.findIndex(h => h.includes('售價'))] || 0) || 0,
+        notes: String(row[headers.findIndex(h => h.includes('備註'))] || '').trim()
+      }));
+      document.getElementById('excel-preview-head').innerHTML = '<tr>' + headers.map(h => '<th style="padding:6px;border:1px solid #333">' + h + '</th>').join('') + '</tr>';
+      document.getElementById('excel-preview-body').innerHTML = json.slice(1,6).map(row => '<tr>' + row.map(c => '<td style="padding:6px;border:1px solid #333">' + (c||'') + '</td>').join('') + '</tr>').join('');
+      document.getElementById('excel-count').textContent = `共 ${excelData.length} 項產品，確認匯入？`;
+      document.getElementById('excel-preview').style.display = 'block';
+      document.getElementById('btn-import-excel').disabled = false;
+    } catch(err) { alert('讀取 Excel 失敗：' + err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+async function doExcelImport() {
+  if (!excelData.length) return;
+  await api('/api/products/bulk', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({products: excelData}) });
+  closeModal('excel'); await loadData(); renderProducts(); alert(`已匯入 ${excelData.length} 項產品！`);
+}
 async function deleteRecord(id) { if (!confirm('確定刪除？')) return; await api('/api/records/' + id, { method: 'DELETE' }); await loadData(); renderRecords(); }
 
 // Init

@@ -46,6 +46,19 @@ db.exec(`
     key TEXT PRIMARY KEY,
     value TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS products (
+    id TEXT PRIMARY KEY,
+    sku TEXT,
+    name TEXT NOT NULL,
+    category TEXT,
+    cost_jpy REAL DEFAULT 0,
+    jan TEXT,
+    suggested_price_hkd REAL DEFAULT 0,
+    notes TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 // Customer operations
@@ -107,4 +120,32 @@ const settingsOps = {
   }
 };
 
-module.exports = { db, customerOps, invoiceOps, recordOps, settingsOps };
+// Product operations
+const productOps = {
+  getAll: () => db.prepare('SELECT * FROM products ORDER BY name').all(),
+  getById: (id) => db.prepare('SELECT * FROM products WHERE id = ?').get(id),
+  create: (p) => {
+    const stmt = db.prepare('INSERT INTO products (id, sku, name, category, cost_jpy, suggested_price_hkd, notes) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    stmt.run(p.id, p.sku || '', p.name, p.category || '', p.cost_jpy || 0, p.suggested_price_hkd || 0, p.notes || '', p.jan || '');
+    return p;
+  },
+  bulkCreate: (products) => {
+    const stmt = db.prepare('INSERT OR REPLACE INTO products (id, sku, name, category, cost_jpy, suggested_price_hkd, notes, jan, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime(\'now\'))');
+    const insertMany = db.transaction((items) => {
+      for (const p of items) {
+        stmt.run(p.id, p.sku || '', p.name, p.category || '', p.cost_jpy || 0, p.suggested_price_hkd || 0, p.notes || '', p.jan || '');
+      }
+    });
+    insertMany(products);
+    return products;
+  },
+  update: (p) => {
+    const stmt = db.prepare('UPDATE products SET sku=?, name=?, category=?, cost_jpy=?, suggested_price_hkd=?, notes=?, jan=?, updated_at=datetime(\'now\') WHERE id=?');
+    stmt.run(p.sku || '', p.name, p.category || '', p.cost_jpy || 0, p.suggested_price_hkd || 0, p.notes || '', p.jan || '', p.id);
+    return p;
+  },
+  delete: (id) => db.prepare('DELETE FROM products WHERE id = ?').run(id),
+  search: (q) => db.prepare('SELECT * FROM products WHERE name LIKE ? OR sku LIKE ? OR jan LIKE ? ORDER BY name LIMIT 20').all(`%${q}%`, `%${q}%`, `%${q}%`)
+};
+
+module.exports = { db, customerOps, invoiceOps, recordOps, settingsOps, productOps };
