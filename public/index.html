@@ -212,7 +212,7 @@ SKU-001,產品A,電子,1000,50,範例備註
 </div>
 <div class="btn-row">
 <button class="btn btn-secondary" onclick="closeModal('excel')">取消</button>
-<button class="btn btn-primary" id="btn-import-excel" onclick="doExcelImport()" disabled>確認匯入</button>
+<button type="button" class="btn btn-primary" id="btn-import-excel" onclick="doExcelImport()" disabled>確認匯入</button>
 </div>
 </div>
 </div>
@@ -665,7 +665,7 @@ function initExcelUpload() {
 }
 
 async function doExcelImport() {
-  alert('🔍 開始匯入...');
+  alert('🔍 doExcelImport 被調用了！');
   if (!excelData.length) { 
     alert('❌ 沒有可匯入的產品資料');
     return; 
