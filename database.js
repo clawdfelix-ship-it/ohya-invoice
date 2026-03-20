@@ -113,7 +113,10 @@ const recordOps = {
 const settingsOps = {
   get: (key) => {
     const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
-    return row ? row.value : null;
+    if (row) return row.value;
+    // Return default exchange rate if not set
+    if (key === 'exchange_rate') return '0.052';
+    return null;
   },
   set: (key, value) => {
     db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, value);

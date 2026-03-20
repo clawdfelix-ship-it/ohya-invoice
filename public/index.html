@@ -524,20 +524,20 @@ function renderProducts() {
           <button class="btn btn-primary" onclick="openNewProduct()">+ 新增產品</button>
         </div>
       </div>
-      ${products.length ? `<table style="margin-top:12px"><thead><tr><th>JAN</th><th>SKU</th><th>產品名稱</th><th>類別</th><th>成本 (JPY)</th><th>建議售價 (HKD)</th><th></th></tr></thead><tbody>${products.map(p => `<tr><td>${p.jan || '-'}</td><td>${p.sku || '-'}</td><td>${p.name}</td><td>${p.category || '-'}</td><td style="color:#ffe66d">¥${(p.cost_jpy || 0).toLocaleString()}</td><td style="color:#00d4aa">$${(p.suggested_price_hkd || 0).toLocaleString()}</td><td><button class="btn btn-sm" style="background:#333" onclick="editProduct('${p.id}'")>編輯</button> <button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.id}'")>刪除</button></td></tr>`).join('')}</tbody></table>` : '<div class="empty">暫時沒有產品 <br><br><a href="data:text/csv;charset=utf-8,SKU,產品名稱,類別,成本(JPY),建議售價(HKD),備註\nSKU-001,產品A,電子,1000,50,範例" download="產品範本.csv" style="color:#00d4aa">📄 下載 CSV 範本</a></div>'}
+      ${products.length ? `<table style="margin-top:12px"><thead><tr><th>JAN</th><th>SKU</th><th>產品名稱</th><th>類別</th><th>成本 (JPY)</th><th>建議售價 (HKD)</th><th></th></tr></thead><tbody>${products.map(p => `<tr><td>${p.jan || '-'}</td><td>${p.sku || '-'}</td><td>${p.name}</td><td>${p.category || '-'}</td><td style="color:#ffe66d">¥${(p.cost_jpy || 0).toLocaleString()}</td><td style="color:#00d4aa">$${(p.suggested_price_hkd || 0).toLocaleString()}</td><td><button class="btn btn-sm" style="background:#333" onclick="editProduct('${p.id}')">編輯</button> <button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.id}')">刪除</button></td></tr>`).join('')}</tbody></table>` : '<div class="empty">暫時沒有產品 <br><br><a href="data:text/csv;charset=utf-8,SKU,產品名稱,類別,成本(JPY),建議售價(HKD),備註\nSKU-001,產品A,電子,1000,50,範例" download="產品範本.csv" style="color:#00d4aa">📄 下載 CSV 範本</a></div>'}
     </div>`;
 }
 
 function filterProducts(q) {
   const filtered = products.filter(p => (p.name || '').toLowerCase().includes(q.toLowerCase()) || (p.sku || '').toLowerCase().includes(q.toLowerCase()) || (p.category || '').toLowerCase().includes(q.toLowerCase()));
   const pv = document.getElementById('view-products');
-  pv.innerHTML = filtered.length ? filtered.map(p => `<div class="list-item"><div class="list-item-info"><h3>${p.name}</h3><p>JAN: ${p.jan || '-'} | SKU: ${p.sku || '-'} | ${p.category || '無類別'}</p></div><div style="display:flex;gap:8px;align-items:center"><span style="color:#ffe66d">¥${(p.cost_jpy||0).toLocaleString()}</span><span style="color:#00d4aa">$${(p.suggested_price_hkd||0).toLocaleString()}</span><button class="btn btn-sm" style="background:#333" onclick="editProduct('${p.id}'")>編輯</button><button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.id}'")>刪除</button></div></div>`).join('') : '<div class="empty">找不到產品</div>';
+  pv.innerHTML = filtered.length ? filtered.map(p => `<div class="list-item"><div class="list-item-info"><h3>${p.name}</h3><p>JAN: ${p.jan || '-'} | SKU: ${p.sku || '-'} | ${p.category || '無類別'}</p></div><div style="display:flex;gap:8px;align-items:center"><span style="color:#ffe66d">¥${(p.cost_jpy||0).toLocaleString()}</span><span style="color:#00d4aa">$${(p.suggested_price_hkd||0).toLocaleString()}</span><button class="btn btn-sm" style="background:#333" onclick="editProduct('${p.id}')">編輯</button><button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.id}')">刪除</button></div></div>`).join('') : '<div class="empty">找不到產品</div>';
 }
 
 function openNewProduct() {
   document.getElementById('product-modal-title').textContent = '📦 新增產品';
-  document.getElementById('edit-product-id').value = ';
-  ['name','sku','jan','category','cost','price','notes'].forEach(f => document.getElementById('prod-' + f).value = ');
+  document.getElementById('edit-product-id').value = '';
+  ['name','sku','jan','category','cost','price','notes'].forEach(f => document.getElementById('prod-' + f).value = '');
   openModal('product');
 }
 
@@ -545,12 +545,12 @@ function editProduct(id) {
   const p = products.find(x => x.id === id); if (!p) return;
   document.getElementById('product-modal-title').textContent = '✏️ 編輯產品';
   document.getElementById('edit-product-id').value = id;
-  document.getElementById('prod-name').value = p.name || ';
-  document.getElementById('prod-sku').value = p.sku || ';
-  document.getElementById('prod-category').value = p.category || ';
+  document.getElementById('prod-name').value = p.name || '';
+  document.getElementById('prod-sku').value = p.sku || '';
+  document.getElementById('prod-category').value = p.category || '';
   document.getElementById('prod-cost').value = p.cost_jpy || 0;
   document.getElementById('prod-price').value = p.suggested_price_hkd || 0;
-  document.getElementById('prod-notes').value = p.notes || ';
+  document.getElementById('prod-notes').value = p.notes || '';
   openModal('product');
 }
 
@@ -587,9 +587,9 @@ document.getElementById('excel-file').addEventListener('change', function(e) {
       excelData = json.slice(1).filter(row => row[nameIdx]).map(row => ({
         id: 'PROD-' + Date.now() + '-' + Math.random().toString(36).substr(2,9),
         sku: String(row[headers.findIndex(h => h.includes('SKU'))] || '').trim(),
-        jan: String(row[headers.findIndex(h => h.includes('JAN'))] || '').trim(),,
+        jan: String(row[headers.findIndex(h => h.includes('JAN'))] || '').trim(),
         name: String(row[nameIdx] || '').trim(),
-        category: String(row[headers.findIndex(h => h.includes('MANUFACTURER'))] || row[headers.findIndex(h => h.includes('廠商'))] || '').trim(),,
+        category: String(row[headers.findIndex(h => h.includes('MANUFACTURER'))] || row[headers.findIndex(h => h.includes('廠商'))] || '').trim(),
         cost_jpy: parseFloat(row[headers.findIndex(h => h.includes('PRICE') || h.includes('成本'))] || 0) || 0,
         suggested_price_hkd: parseFloat(row[headers.findIndex(h => h.includes('售價'))] || 0) || 0,
         notes: String(row[headers.findIndex(h => h.includes('備註'))] || '').trim()
