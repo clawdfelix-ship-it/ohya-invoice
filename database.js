@@ -1,7 +1,12 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 
-const db = new Database(path.join(__dirname, 'oha-invoice.db'));
+// Use RAILWAY_VOLUME_PATH if set, otherwise fallback to /app/data, then __dirname
+const RAILWAY_VOLUME_PATH = process.env.RAILWAY_VOLUME_PATH || '/app/data';
+const DB_PATH = path.join(RAILWAY_VOLUME_PATH, 'oha-invoice.db');
+
+console.log(`[database] DB_PATH=${DB_PATH}`);
+const db = new Database(DB_PATH);
 
 // Enable WAL mode for better performance
 db.pragma('journal_mode = WAL');
