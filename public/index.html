@@ -665,9 +665,24 @@ function initExcelUpload() {
 }
 
 async function doExcelImport() {
-  if (!excelData.length) return;
-  await api('/api/products/bulk', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({products: excelData}) });
-  closeModal('excel'); await loadData(); renderProducts(); alert(`已匯入 ${excelData.length} 項產品！`);
+  console.log('🔍 doExcelImport called', { excelDataLength: excelData.length });
+  if (!excelData.length) { 
+    console.warn('⚠️ excelData is empty!');
+    alert('❌ 沒有可匯入的產品資料');
+    return; 
+  }
+  try {
+    console.log('📤 Uploading', excelData.length, 'products...');
+    await api('/api/products/bulk', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({products: excelData}) });
+    console.log('✅ Upload complete');
+    closeModal('excel'); 
+    await loadData(); 
+    renderProducts(); 
+    alert(`✅ 已匯入 ${excelData.length} 項產品！`);
+  } catch(err) {
+    console.error('❌ Upload failed:', err);
+    alert('❌ 匯入失敗：' + err.message);
+  }
 }
 async function deleteRecord(id) { if (!confirm('確定刪除？')) return; await api('/api/records/' + id, { method: 'DELETE' }); await loadData(); renderRecords(); }
 
