@@ -1,6 +1,6 @@
 # OHA Invoice Web App
 
-會計開單系統 - Node.js + SQLite Web App
+會計開單系統 - Next.js + Neon PostgreSQL (Vercel)
 
 ## 安裝
 
