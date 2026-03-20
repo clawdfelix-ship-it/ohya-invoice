@@ -125,7 +125,7 @@ const productOps = {
   getAll: () => db.prepare('SELECT * FROM products ORDER BY name').all(),
   getById: (id) => db.prepare('SELECT * FROM products WHERE id = ?').get(id),
   create: (p) => {
-    const stmt = db.prepare('INSERT INTO products (id, sku, name, category, cost_jpy, suggested_price_hkd, notes) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    const stmt = db.prepare('INSERT INTO products (id, sku, name, category, cost_jpy, suggested_price_hkd, notes, jan) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
     stmt.run(p.id, p.sku || '', p.name, p.category || '', p.cost_jpy || 0, p.suggested_price_hkd || 0, p.notes || '', p.jan || '');
     return p;
   },
