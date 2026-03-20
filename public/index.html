@@ -580,43 +580,87 @@ async function saveProduct() {
 
 async function deleteProduct(id) { if (!confirm('確定刪除這個產品？')) return; await api('/api/products/' + id, { method: 'DELETE' }); await loadData(); renderProducts(); }
 
-function openExcelModal() { document.getElementById('excel-file').value = ''; document.getElementById('excel-preview').style.display = 'none'; document.getElementById('btn-import-excel').disabled = true; openModal('excel'); }
+function openExcelModal() { 
+  document.getElementById('excel-file').value = ''; 
+  document.getElementById('excel-preview').style.display = 'none'; 
+  document.getElementById('btn-import-excel').disabled = true; 
+  document.getElementById('excel-count').textContent = '';
+  openModal('excel'); 
+}
 
 let excelData = [];
-document.getElementById('excel-file').addEventListener('change', function(e) {
-  const file = e.target.files[0]; if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function(ev) {
-    try {
-      const data = new Uint8Array(ev.target.result);
-      const wb = XLSX.read(data, {type: 'array'});
-      const wsname = wb.SheetNames[0];
-      const ws = wb.Sheets[wsname];
-      const json = XLSX.utils.sheet_to_json(ws, {header:1});
-      if (json.length < 2) { alert('Excel 檔案沒有資料'); return; }
-      const headers = json[0].map(h => String(h).trim());
-      const required = ['產品名稱'];
-      const nameIdx = headers.findIndex(h => h.includes('ITEM NAME') || h.includes('產品名稱'));
-      if (nameIdx < 0) { alert('找不到「產品名稱」欄位，請使用範本格式'); return; }
-      excelData = json.slice(1).filter(row => row[nameIdx]).map(row => ({
-        id: 'PROD-' + Date.now() + '-' + Math.random().toString(36).substr(2,9),
-        sku: String(row[headers.findIndex(h => h.includes('SKU'))] || '').trim(),
-        jan: String(row[headers.findIndex(h => h.includes('JAN'))] || '').trim(),
-        name: String(row[nameIdx] || '').trim(),
-        category: String(row[headers.findIndex(h => h.includes('MANUFACTURER'))] || row[headers.findIndex(h => h.includes('廠商'))] || '').trim(),
-        cost_jpy: parseFloat(row[headers.findIndex(h => h.includes('PRICE') || h.includes('成本'))] || 0) || 0,
-        suggested_price_hkd: parseFloat(row[headers.findIndex(h => h.includes('售價'))] || 0) || 0,
-        notes: String(row[headers.findIndex(h => h.includes('備註'))] || '').trim()
-      }));
-      document.getElementById('excel-preview-head').innerHTML = '<tr>' + headers.map(h => '<th style="padding:6px;border:1px solid #333">' + h + '</th>').join('') + '</tr>';
-      document.getElementById('excel-preview-body').innerHTML = json.slice(1,6).map(row => '<tr>' + row.map(c => '<td style="padding:6px;border:1px solid #333">' + (c||'') + '</td>').join('') + '</tr>').join('');
-      document.getElementById('excel-count').textContent = `共 ${excelData.length} 項產品，確認匯入？`;
-      document.getElementById('excel-preview').style.display = 'block';
-      document.getElementById('btn-import-excel').disabled = false;
-    } catch(err) { alert('讀取 Excel 失敗：' + err.message); }
-  };
-  reader.readAsArrayBuffer(file);
-});
+
+// Excel 文件上传处理 - 移到 init 函数内确保 XLSX 已加载
+function initExcelUpload() {
+  const fileInput = document.getElementById('excel-file');
+  if (!fileInput) return;
+  
+  fileInput.addEventListener('change', function(e) {
+    console.log('📥 File selected:', e.target.files[0]?.name);
+    const file = e.target.files[0]; 
+    if (!file) return;
+    
+    // 检查 XLSX 库是否加载
+    if (typeof XLSX === 'undefined') {
+      alert('❌ XLSX 库未加载，请刷新页面重试');
+      console.error('XLSX is not defined');
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        const data = new Uint8Array(ev.target.result);
+        const wb = XLSX.read(data, {type: 'array'});
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const json = XLSX.utils.sheet_to_json(ws, {header:1});
+        
+        console.log('📊 Excel data:', json.length, 'rows');
+        
+        if (json.length < 2) { 
+          alert('📄 Excel 檔案沒有資料'); 
+          return; 
+        }
+        
+        const headers = json[0].map(h => String(h).trim());
+        console.log('📋 Headers:', headers);
+        
+        const nameIdx = headers.findIndex(h => h.includes('ITEM NAME') || h.includes('產品名稱') || h.includes('Name'));
+        if (nameIdx < 0) { 
+          alert('❌ 找不到「產品名稱」欄位，請使用範本格式\n\n需要包含：產品名稱、SKU、成本、售價 等欄位'); 
+          return; 
+        }
+        
+        excelData = json.slice(1).filter(row => row[nameIdx]).map(row => ({
+          id: 'PROD-' + Date.now() + '-' + Math.random().toString(36).substr(2,9),
+          sku: String(row[headers.findIndex(h => h.includes('SKU'))] || '').trim(),
+          jan: String(row[headers.findIndex(h => h.includes('JAN'))] || '').trim(),
+          name: String(row[nameIdx] || '').trim(),
+          category: String(row[headers.findIndex(h => h.includes('MANUFACTURER'))] || row[headers.findIndex(h => h.includes('廠商'))] || '').trim(),
+          cost_jpy: parseFloat(row[headers.findIndex(h => h.includes('PRICE') || h.includes('成本'))] || 0) || 0,
+          suggested_price_hkd: parseFloat(row[headers.findIndex(h => h.includes('售價'))] || 0) || 0,
+          notes: String(row[headers.findIndex(h => h.includes('備註'))] || '').trim()
+        }));
+        
+        console.log('✅ Parsed', excelData.length, 'products');
+        
+        document.getElementById('excel-preview-head').innerHTML = '<tr>' + headers.map(h => '<th style="padding:6px;border:1px solid #333">' + h + '</th>').join('') + '</tr>';
+        document.getElementById('excel-preview-body').innerHTML = json.slice(1,6).map(row => '<tr>' + row.map(c => '<td style="padding:6px;border:1px solid #333">' + (c||'') + '</td>').join('') + '</tr>').join('');
+        document.getElementById('excel-count').textContent = `共 ${excelData.length} 項產品，確認匯入？`;
+        document.getElementById('excel-preview').style.display = 'block';
+        document.getElementById('btn-import-excel').disabled = false;
+      } catch(err) { 
+        console.error('❌ Excel parse error:', err);
+        alert('❌ 讀取 Excel 失敗：' + err.message + '\n\n请确保文件格式正确，使用 CSV 範本试试。'); 
+      }
+    };
+    reader.onerror = () => {
+      alert('❌ 文件读取失败');
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
 
 async function doExcelImport() {
   if (!excelData.length) return;
@@ -634,6 +678,11 @@ if (document.readyState === 'loading') {
 
 function init() {
   console.log('🚀 Initializing app...');
+  console.log('📦 XLSX loaded:', typeof XLSX !== 'undefined');
+  
+  // 初始化 Excel 上传功能
+  initExcelUpload();
+  
   loadData().then(() => {
     console.log('📊 Data loaded:', { customers: customers.length, invoices: invoices.length, products: products.length });
     showView('dashboard');
