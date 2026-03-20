@@ -28,7 +28,7 @@ export const invoices = pgTable('invoices', {
 export const records = pgTable('records', {
   id: varchar('id', { length: 50 }).primaryKey(),
   date: varchar('date', { length: 20 }).notNull(),
-  desc: varchar('desc', { length: 500 }).notNull(),
+  description: varchar('description', { length: 500 }).notNull(),
   type: varchar('type', { length: 20 }).notNull(), // 'income' or 'expense'
   amount: real('amount').notNull(),
   createdAt: timestamp('created_at').defaultNow(),

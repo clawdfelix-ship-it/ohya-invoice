@@ -39,7 +39,7 @@ export async function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS records (
         id VARCHAR(50) PRIMARY KEY,
         date VARCHAR(20) NOT NULL,
-        desc VARCHAR(500) NOT NULL,
+        description VARCHAR(500) NOT NULL,
         type VARCHAR(20) NOT NULL,
         amount REAL NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
