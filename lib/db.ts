@@ -1,17 +1,15 @@
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
-import { sql as drizzleSql } from 'drizzle-orm';
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
 
 if (!databaseUrl) {
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('DATABASE_URL is required in production');
+    throw new Error('DATABASE_URL or POSTGRES_URL is required in production');
   }
-  console.warn('⚠️ No DATABASE_URL found. Database queries will fail.');
+  console.warn('⚠️ No database connection string found. Database queries will fail.');
 }
 
-// Export db instance for Drizzle ORM operations
-// Export sql for raw SQL queries (migrations, etc.)
-export const db = databaseUrl ? drizzle(neon(databaseUrl)) : null as any;
-export { drizzleSql as sql };
+export const sql = databaseUrl ? neon(databaseUrl) : null;
+
+export const db = databaseUrl ? drizzle(sql!) : null as any;
