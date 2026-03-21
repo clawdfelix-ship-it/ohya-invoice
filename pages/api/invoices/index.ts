@@ -4,12 +4,16 @@ import { invoices } from '../../../lib/schema';
 import { eq, desc } from 'drizzle-orm';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (!db) return res.status(500).json({ error: 'Database not configured' });
+  if (!db) {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    return res.status(500).end(JSON.stringify({ error: 'Database not configured' }));
+  }
 
   try {
     if (req.method === 'GET') {
       const results = await db.select().from(invoices).orderBy(desc(invoices.date));
-      return res.json(results.map(inv => ({ ...inv, items: JSON.parse(inv.items || '[]') })));
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      return res.end(JSON.stringify(results.map(inv => ({ ...inv, items: JSON.parse(inv.items || '[]') }))));
     }
 
     if (req.method === 'POST') {
@@ -18,11 +22,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         id, no, client, clientEmail: client_email || '', clientAddress: client_address || '',
         date, items: JSON.stringify(items), paid: paid ? 1 : 0, exchangeRate: exchange_rate || 0
       });
-      return res.json(req.body);
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      return res.end(JSON.stringify(req.body));
     }
 
-    return res.status(405).json({ error: 'Method not allowed' });
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    return res.status(405).end(JSON.stringify({ error: 'Method not allowed' }));
   } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    return res.status(500).end(JSON.stringify({ error: err.message }));
   }
 }

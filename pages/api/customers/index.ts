@@ -4,29 +4,37 @@ import { customers } from '../../../lib/schema';
 import { eq, like, sql } from 'drizzle-orm';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (!db) return res.status(500).json({ error: 'Database not configured' });
+  if (!db) {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    return res.status(500).end(JSON.stringify({ error: 'Database not configured' }));
+  }
 
   try {
     if (req.method === 'GET') {
       const { q } = req.query;
+      let results;
       if (q) {
-        const results = await db.select().from(customers)
+        results = await db.select().from(customers)
           .where(like(customers.name, `%${q}%`))
           .limit(10);
-        return res.json(results);
+      } else {
+        results = await db.select().from(customers).orderBy(customers.name);
       }
-      const results = await db.select().from(customers).orderBy(customers.name);
-      return res.json(results);
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      return res.end(JSON.stringify(results));
     }
 
     if (req.method === 'POST') {
       const { id, name, phone, email, company, address, notes } = req.body;
       await db.insert(customers).values({ id, name, phone: phone || '', email: email || '', company: company || '', address: address || '', notes: notes || '' });
-      return res.json({ id, name, phone, email, company, address, notes });
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      return res.end(JSON.stringify({ id, name, phone, email, company, address, notes }));
     }
 
-    return res.status(405).json({ error: 'Method not allowed' });
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    return res.status(405).end(JSON.stringify({ error: 'Method not allowed' }));
   } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    return res.status(500).end(JSON.stringify({ error: err.message }));
   }
 }
