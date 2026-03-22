@@ -463,6 +463,8 @@ async function deleteRecord(id) { if (!confirm('確定刪除？')) return; await
 
 // Init
 loadData().then(() => showView('dashboard'));
+
+// ===== OHA Invoice Fix =====
 // Fix injected for OHA Invoice app
 (function() {
   // 1. viewInvoice - show invoice detail modal
@@ -603,6 +605,8 @@ loadData().then(() => showView('dashboard'));
 
   console.log('[OHA Fix] Injected: viewInvoice, downloadInvoicePDF, sendInvoiceEmail, patched renderInvoices');
 })();
+
+
 
 </script>
 </body>
