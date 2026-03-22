@@ -408,25 +408,25 @@ function renderInvoices() {
         <button class="btn btn-primary" onclick="openNewInvoice()">+ 新增發票</button>
       </div>
       ${invoices.length ? invoices.map(i => {
-        const total = i.items?.reduce((s,it) => s + it.qty * it.price, 0) || 0;
-        const itemCount = i.items?.length || 0;
-        return `<div class="order-card" id="card-${escAttr(i.id)}" onclick="toggleOrder('${escAttr(i.id)}')">
-          <div class="order-header">
-            <div class="order-header-left">
-              <span class="order-id">${escHtml(i.no || '-')}</span>
-              <span class="order-client">${escHtml(i.client || '-')}</span>
-              <span style="color:#555;font-size:12px">${escHtml(i.date || '-')}</span>
+        const total = (i.items || []).reduce((s,it) => s + (it.qty||1)*(it.price||0), 0);
+        const isOpen = selectedInvoiceId === i.id;
+        return `<div class="invoice-card ${isOpen ? 'open' : ''}" id="inv-card-${escAttr(i.id)}">
+          <div class="invoice-card-header" onclick="toggleInvoice('${escAttr(i.id)}')">
+            <div style="flex:1;min-width:0">
+              <h3 style="font-size:14px;margin-bottom:4px">${escHtml(i.client || '-')} — ${escHtml(i.no || '-')}</h3>
+              <p style="color:#888;font-size:12px">${escHtml(i.date || '-')} · ${i.items?.length || 0} 項目</p>
             </div>
-            <div class="order-header-right">
-              <span class="order-amount">$${total.toLocaleString()}</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+              <span style="font-weight:600;font-size:14px">$${total.toLocaleString()}</span>
               <span class="status ${i.paid ? 'paid' : 'unpaid'}">${i.paid ? '已付' : '未付'}</span>
-              <span class="order-chevron">▼</span>
+              <span class="inv-chevron">▼</span>
             </div>
           </div>
-        </div>
-        <div id="detail-${escAttr(i.id)}" class="order-detail">
-          ${renderInvoiceDetail(i)}
-        </div>`;}).join('') : '<div class="empty">暫時沒有發票</div>'}
+          <div class="invoice-card-body" id="inv-detail-${escAttr(i.id)}">
+            ${isOpen ? renderInvoiceDetail(i) : ''}
+          </div>
+        </div>`;
+      }).join('') : '<div class="empty">暫時沒有發票</div>'}
     </div>`;
 }
 
@@ -547,20 +547,62 @@ async function saveRecord() {
 async function deleteRecord(id) { if (!confirm('確定刪除？')) return; await api('/api/records/' + id, { method: 'DELETE' }); await loadData(); renderRecords(); }
 
 // Init
-loadData().then(() => showView('dashboard'));
+loadData().then(function() {
+  // Handle hash routing on first load
+  if (window.location.hash && window.location.hash.match(/^#invoice\//)) {
+    handleHash();
+  } else {
+    showView('dashboard');
+  }
+});
 
 // ===== Order Card Accordion =====
-function toggleOrder(id) {
-  var detail = document.getElementById('detail-' + id);
-  var card = document.getElementById('card-' + id);
-  if (!detail) return;
-  if (detail.classList.contains('show')) {
-    detail.classList.remove('show');
-    if (card) card.classList.remove('expanded');
+function toggleInvoice(id) {
+  var isCurrentlyOpen = selectedInvoiceId === id;
+  if (isCurrentlyOpen) {
+    selectedInvoiceId = null;
+    history.pushState(null, '', window.location.pathname + window.location.search);
   } else {
-    detail.classList.add('show');
-    if (card) card.classList.add('expanded');
+    selectedInvoiceId = id;
+    history.pushState(null, '', '#invoice/' + id);
   }
+  // Toggle the card
+  document.querySelectorAll('.invoice-card').forEach(function(el) {
+    var elId = el.id.replace('inv-card-', '');
+    el.classList.toggle('open', elId === id);
+  });
+  // Lazy render detail only when opening
+  if (!isCurrentlyOpen) {
+    var inv = invoices.find(function(i) { return i.id === id; });
+    if (inv) {
+      var detailEl = document.getElementById('inv-detail-' + id.replace(/'/g, "\\'"));
+      if (detailEl) detailEl.innerHTML = renderInvoiceDetail(inv);
+    }
+  }
+}
+
+// Handle browser back/forward
+window.addEventListener('popstate', function() {
+  handleHash();
+});
+
+function handleHash() {
+  var hash = window.location.hash;
+  var match = hash.match(/^#invoice\/(.+)$/);
+  if (match) {
+    var id = match[1];
+    var inv = invoices.find(function(i) { return i.id === id; });
+    if (inv) {
+      selectedInvoiceId = id;
+      renderInvoices();
+      // Scroll to card
+      var card = document.getElementById('inv-card-' + id.replace(/'/g, "\\'"));
+      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+  }
+  selectedInvoiceId = null;
+  if (document.getElementById('view-invoices')) renderInvoices();
 }
 
 function escAttr(s) {
@@ -596,7 +638,6 @@ function renderInvoiceDetail(inv) {
       '<div class="order-actions-left">' +
         '<button class="btn btn-primary btn-sm" onclick="downloadInvoicePDF(\'' + escAttr(inv.id) + '\')">📥 PDF</button>' +
         '<button class="btn btn-secondary btn-sm" onclick="sendInvoiceEmail(\'' + escAttr(inv.id) + '\')">📧 電郵</button>' +
-        '<button class="btn btn-secondary btn-sm" onclick="viewInvoice(\'' + escAttr(inv.id) + '\')">🔍 詳情</button>' +
       '</div>' +
       '<div class="order-actions-right">' +
         (!inv.paid ? '<button class="btn btn-primary btn-sm" onclick="markInvoicePaid(\'' + escAttr(inv.id) + '\')">✅ 設為已付</button>' : '') +
