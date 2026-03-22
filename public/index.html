@@ -463,6 +463,147 @@ async function deleteRecord(id) { if (!confirm('確定刪除？')) return; await
 
 // Init
 loadData().then(() => showView('dashboard'));
+// Fix injected for OHA Invoice app
+(function() {
+  // 1. viewInvoice - show invoice detail modal
+  window.viewInvoice = function(id) {
+    var inv = invoices.find(function(i){ return i.id === id; });
+    if (!inv) return;
+    var rate = inv.exchange_rate || 0.052;
+    var total = 0, totalCost = 0;
+    var itemsHtml = (inv.items || []).map(function(it) {
+      var qty = it.qty || 1;
+      var costTotal = (it.costJpy || 0) * qty * rate;
+      var sale = qty * (it.price || 0);
+      total += sale; totalCost += costTotal;
+      return '<tr><td>' + escHtml(it.desc || '-') + '</td><td style="text-align:center">' + qty + '</td><td style="text-align:right">$' + (it.price || 0).toFixed(2) + '</td><td style="text-align:right">$' + sale.toFixed(2) + '</td></tr>';
+    }).join('');
+    var profit = total - totalCost;
+    var margin = total > 0 ? (profit / total * 100).toFixed(1) : 0;
+    var totalCostJpy = (inv.items || []).reduce(function(s,it){ return s + ((it.costJpy||0)*(it.qty||1)); }, 0);
+    var html = '<div class="inv-detail-wrap">' +
+      '<div class="inv-detail-header">' +
+        '<div><h2>' + escHtml(inv.client || '-') + '</h2><div class="inv-meta">' + escHtml(inv.no || '-') + ' &nbsp;|&nbsp; ' + escHtml(inv.date || '-') + '</div></div>' +
+        '<span class="status ' + (inv.paid ? 'paid' : 'unpaid') + '">' + (inv.paid ? '已付' : '未付') + '</span>' +
+      '</div>' +
+      (inv.client_email || inv.client_address ? '<div class="inv-meta">' + (inv.client_email ? '📧 ' + escHtml(inv.client_email) : '') + (inv.client_address ? '<br>📍 ' + escHtml(inv.client_address) : '') + '</div>' : '') +
+      '<div class="inv-detail-section"><h3>項目</h3>' +
+      '<table class="inv-table"><thead><tr><th>描述</th><th style="text-align:center">數量</th><th style="text-align:right">單價 (HKD)</th><th style="text-align:right">合計</th></tr></thead><tbody>' + itemsHtml + '</tbody></table>' +
+      '</div>' +
+      '<div class="inv-totals">' +
+        '<div class="inv-totals-row"><span class="tl">總成本 (JPY)</span><span class="tv" style="color:#ffe66d">¥' + totalCostJpy.toLocaleString() + '</span></div>' +
+        '<div class="inv-totals-row"><span class="tl">總銷售</span><span class="tv">$' + total.toFixed(2) + '</span></div>' +
+        '<div class="inv-totals-row"><span class="tl">總利潤</span><span class="tv" style="color:#00d4aa">$' + profit.toFixed(2) + '</span></div>' +
+        '<div class="inv-totals-row"><span class="tl">利潤率</span><span class="tv" style="color:#4ecdc4">' + margin + '%</span></div>' +
+      '</div>' +
+      '<div class="inv-actions">' +
+        '<button class="btn btn-secondary" onclick="closeModal(\'invoice-detail\')">關閉</button> ' +
+        '<button class="btn btn-primary" onclick="downloadInvoicePDF(\'' + id + '\')">📥 下載 PDF</button> ' +
+        '<button class="btn btn-secondary" onclick="sendInvoiceEmail(\'' + id + '\')">📧 發送電郵</button>' +
+        (!inv.paid ? ' <button class="btn btn-primary btn-sm" onclick="markInvoicePaid(\'' + id + '\')">設為已付</button>' : '') +
+      '</div>' +
+    '</div>';
+    document.getElementById('invoice-detail-content').innerHTML = html;
+    openModal('invoice-detail');
+  };
+
+  // 2. Escape HTML helper
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // 3. downloadInvoicePDF
+  window.downloadInvoicePDF = function(id) {
+    var inv = invoices.find(function(i){ return i.id === id; });
+    if (!inv) return;
+    var rate = inv.exchange_rate || 0.052;
+    var total = 0, totalCost = 0;
+    var rows = (inv.items || []).map(function(it) {
+      var qty = it.qty || 1;
+      var sale = qty * (it.price || 0);
+      var costJpy = (it.costJpy || 0) * qty;
+      total += sale; totalCost += costJpy * rate;
+      return '<tr><td>' + escHtml(it.desc||'-') + '</td><td style="text-align:center">' + qty + '</td><td style="text-align:right">$' + (it.price||0).toFixed(2) + '</td><td style="text-align:right">$' + sale.toFixed(2) + '</td></tr>';
+    }).join('');
+    var profit = total - totalCost;
+    var margin = total > 0 ? (profit/total*100).toFixed(1) : 0;
+    var bg = inv.paid ? '#00d4aa' : '#ff6b6b';
+    var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice ' + escHtml(inv.no||'') + '</title>' +
+      '<style>body{font-family:Arial,sans-serif;padding:40px;max-width:700px;margin:0 auto;color:#333}' +
+      '.hdr{margin-bottom:24px}.title{font-size:28px;font-weight:bold}.sub{color:#888;font-size:13px;margin-top:4px}' +
+      '.meta{margin:12px 0;font-size:14px;line-height:1.7}.bold{font-weight:bold}' +
+      'table{width:100%;border-collapse:collapse;margin-top:16px}' +
+      '.th{background:#f0f0f0;padding:8px 10px;text-align:left;font-size:12px;font-weight:bold}' +
+      '.td{padding:8px 10px;border-bottom:1px solid #eee;font-size:13px}' +
+      '.r{text-align:right}.totals{margin-top:16px;text-align:right}' +
+      '.tr{display:flex;justify-content:flex-end;gap:40px;padding:5px 0;border-bottom:1px solid #eee}' +
+      '.tl{color:#666;min-width:100px}.tv{font-weight:bold;min-width:100px}' +
+      '.badge{display:inline-block;padding:6px 14px;border-radius:20px;color:#fff;font-size:12px;font-weight:bold;margin-top:16px}' +
+      '</style></head><body>' +
+      '<div class="hdr"><div class="title">INVOICE</div><div class="sub">' + escHtml(inv.no||'') + '</div></div>' +
+      '<div class="meta"><span class="bold">' + escHtml(inv.client||'') + '</span>' +
+      (inv.client_email ? '<br>📧 ' + escHtml(inv.client_email) : '') +
+      (inv.client_address ? '<br>📍 ' + escHtml(inv.client_address) : '') +
+      '</div>' +
+      '<div class="meta">📅 日期: ' + escHtml(inv.date||'') + '</div>' +
+      '<table><thead><tr><th class="th">描述</th><th class="th r">數量</th><th class="th r">單價 (HKD)</th><th class="th r">合計</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+      '<div class="totals">' +
+        '<div class="tr"><span class="tl">總成本</span><span class="tv" style="color:#d4a000">¥' + totalCostJpy(inv).toLocaleString() + '</span></div>' +
+        '<div class="tr"><span class="tl">總銷售</span><span class="tv">$' + total.toFixed(2) + '</span></div>' +
+        '<div class="tr"><span class="tl">利潤</span><span class="tv" style="color:#00a080">$' + profit.toFixed(2) + '</span></div>' +
+        '<div class="tr"><span class="tl">利潤率</span><span class="tv" style="color:#4ecdc4">' + margin + '%</span></div>' +
+      '</div>' +
+      '<div><span class="badge" style="background:' + bg + '">' + (inv.paid ? 'PAID' : 'UNPAID') + '</span></div>' +
+      '</body></html>';
+    var w = window.open('', '_blank');
+    w.document.write(html); w.document.close();
+    setTimeout(function(){ w.print(); }, 500);
+  };
+
+  function totalCostJpy(inv) {
+    return (inv.items||[]).reduce(function(s,it){ return s + ((it.costJpy||0)*(it.qty||1)); }, 0);
+  }
+
+  // 4. sendInvoiceEmail
+  window.sendInvoiceEmail = function(id) {
+    var inv = invoices.find(function(i){ return i.id === id; });
+    if (!inv) return;
+    var email = inv.client_email;
+    if (!email) { alert('這個客戶沒有電郵地址，請先在客戶資料中填寫電郵。'); return; }
+    var rate = inv.exchange_rate || 0.052;
+    var total = (inv.items||[]).reduce(function(s,it){ return s + (it.qty||1)*(it.price||0); }, 0);
+    var subject = '發票 ' + (inv.no||'') + ' - ' + (inv.client||'');
+    var body = '您好,\n\n請查閱附件中的發票\n\n發票編號: ' + (inv.no||'') + '\n日期: ' + (inv.date||'') + '\n金額: $' + total.toFixed(2) + '\n\n謝謝';
+    window.open('mailto:' + encodeURIComponent(email).replace(/%20/g,'') + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body), '_blank');
+  };
+
+  // 5. Patch renderInvoices to make items clickable
+  var _origRenderInvoices = window.renderInvoices;
+  window.renderInvoices = function() {
+    var iv = document.getElementById('view-invoices');
+    iv.innerHTML = '<div class="card"><div class="card-header"><h2>發票列表 (' + invoices.length + ')</h2><button class="btn btn-primary" onclick="openNewInvoice()">+ 新增發票</button></div>';
+    if (!invoices.length) {
+      iv.innerHTML += '<div class="empty">暫時沒有發票</div></div>';
+      return;
+    }
+    var card = iv.querySelector('.card');
+    invoices.forEach(function(i) {
+      var total = (i.items||[]).reduce(function(s,it){ return s + (it.qty||1)*(it.price||0); }, 0);
+      var el = document.createElement('div');
+      el.className = 'list-item';
+      el.innerHTML = '<div class="list-item-info"><h3>' + escHtml(i.client||'-') + ' - ' + escHtml(i.no||'-') + '</h3><p>' + escHtml(i.date||'-') + ' | ' + (i.items||[]).length + ' 項目 | $' + total.toLocaleString() + '</p></div><div class="list-item-actions"><span class="status ' + (i.paid?'paid':'unpaid') + '">' + (i.paid?'已付':'未付') + '</span></div>';
+      el.addEventListener('click', (function(id){ return function(e) {
+        if (e.target.closest('.list-item-actions')) return;
+        viewInvoice(id);
+      }; })(i.id));
+      card.appendChild(el);
+    });
+    iv.innerHTML += '</div>';
+  };
+
+  console.log('[OHA Fix] Injected: viewInvoice, downloadInvoicePDF, sendInvoiceEmail, patched renderInvoices');
+})();
+
 </script>
 </body>
 </html>
