@@ -636,12 +636,12 @@ function renderInvoiceDetail(inv) {
     '<div class="order-total-bar"><span class="otl">總利潤</span><span style="color:#00d4aa">$' + profit.toFixed(2) + ' (' + margin + '%)</span></div>' +
     '<div class="order-detail-actions">' +
       '<div class="order-actions-left">' +
-        '<button class="btn btn-primary btn-sm" onclick="downloadInvoicePDF(\'' + escAttr(inv.id) + '\')">📥 PDF</button>' +
-        '<button class="btn btn-secondary btn-sm" onclick="sendInvoiceEmail(\'' + escAttr(inv.id) + '\')">📧 電郵</button>' +
+        '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();downloadInvoicePDF(\'' + escAttr(inv.id) + '\')">📥 PDF</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();sendInvoiceEmail(\'' + escAttr(inv.id) + '\')">📧 電郵</button>' +
       '</div>' +
       '<div class="order-actions-right">' +
-        (!inv.paid ? '<button class="btn btn-primary btn-sm" onclick="markInvoicePaid(\'' + escAttr(inv.id) + '\')">✅ 設為已付</button>' : '') +
-        '<button class="btn btn-danger btn-sm" onclick="deleteInvoice(\'' + escAttr(inv.id) + '\')">🗑 刪除</button>' +
+        (!inv.paid ? '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();markInvoicePaid(\'' + escAttr(inv.id) + '\')">✅ 設為已付</button>' : '') +
+        '<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteInvoice(\'' + escAttr(inv.id) + '\')">🗑 刪除</button>' +
       '</div>' +
     '</div>';
 }
