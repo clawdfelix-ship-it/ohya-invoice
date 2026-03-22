@@ -41,8 +41,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 .form-group input:focus,.form-group select:focus{outline:none;border-color:#00d4aa}
 .btn-row{display:flex;gap:10px;margin-top:20px;justify-content:flex-end}
 .list{display:grid;gap:10px}
-.list-item{background:#252540;padding:14px 16px;border-radius:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.list-item{background:#252540;padding:14px 16px;border-radius:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;cursor:pointer}
 .list-item:hover{background:#2a2a45}
+.inv-detail-wrap{padding:0}
+.inv-detail-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:10px}
+.inv-detail-header h2{margin:0 0 4px;font-size:20px}
+.inv-meta{color:#888;font-size:13px;line-height:1.5}
+.inv-detail-section{margin-top:16px}
+.inv-table{width:100%;border-collapse:collapse;margin-top:8px}
+.inv-table th{background:#252540;padding:8px 10px;text-align:left;font-size:12px;color:#888;font-weight:600}
+.inv-table td{padding:8px 10px;border-bottom:1px solid #252540;font-size:13px}
+.inv-totals{margin-top:16px;background:#0f0f23;border-radius:8px;padding:12px}
+.inv-totals-row{display:flex;justify-content:space-between;padding:6px 0}
+.inv-totals-row .tl{color:#888;font-size:14px}
+.inv-totals-row .tv{font-weight:600;font-size:14px}
+.inv-actions{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap}
 .list-item-info h3{font-size:15px;margin-bottom:4px}
 .list-item-info p{color:#888;font-size:12px}
 .list-item-actions{display:flex;gap:8px;align-items:center}
@@ -163,6 +176,13 @@ tr:hover{background:#1f1f35}
 <button class="btn btn-secondary" onclick="closeModal('invoice')">取消</button>
 <button class="btn btn-primary" onclick="saveInvoice()">儲存</button>
 </div>
+</div>
+</div>
+
+<!-- Invoice Detail Modal -->
+<div class="modal" id="modal-invoice-detail">
+<div class="modal-content">
+<div id="invoice-detail-content"></div>
 </div>
 </div>
 
@@ -583,24 +603,30 @@ loadData().then(() => showView('dashboard'));
   var _origRenderInvoices = window.renderInvoices;
   window.renderInvoices = function() {
     var iv = document.getElementById('view-invoices');
-    iv.innerHTML = '<div class="card"><div class="card-header"><h2>發票列表 (' + invoices.length + ')</h2><button class="btn btn-primary" onclick="openNewInvoice()">+ 新增發票</button></div>';
+    var html = '<div class="card"><div class="card-header"><h2>發票列表 (' + invoices.length + ')</h2><button class="btn btn-primary" onclick="openNewInvoice()">+ 新增發票</button></div>';
     if (!invoices.length) {
-      iv.innerHTML += '<div class="empty">暫時沒有發票</div></div>';
+      html += '<div class="empty">暫時沒有發票</div></div>';
+      iv.innerHTML = html;
       return;
     }
-    var card = iv.querySelector('.card');
     invoices.forEach(function(i) {
       var total = (i.items||[]).reduce(function(s,it){ return s + (it.qty||1)*(it.price||0); }, 0);
-      var el = document.createElement('div');
-      el.className = 'list-item';
-      el.innerHTML = '<div class="list-item-info"><h3>' + escHtml(i.client||'-') + ' - ' + escHtml(i.no||'-') + '</h3><p>' + escHtml(i.date||'-') + ' | ' + (i.items||[]).length + ' 項目 | $' + total.toLocaleString() + '</p></div><div class="list-item-actions"><span class="status ' + (i.paid?'paid':'unpaid') + '">' + (i.paid?'已付':'未付') + '</span></div>';
-      el.addEventListener('click', (function(id){ return function(e) {
-        if (e.target.closest('.list-item-actions')) return;
-        viewInvoice(id);
-      }; })(i.id));
-      card.appendChild(el);
+      html += '<div class="list-item" data-invoice-id="' + i.id + '">' +
+        '<div class="list-item-info"><h3>' + escHtml(i.client||'-') + ' - ' + escHtml(i.no||'-') + '</h3><p>' + escHtml(i.date||'-') + ' | ' + (i.items||[]).length + ' 項目 | $' + total.toLocaleString() + '</p></div>' +
+        '<div class="list-item-actions"><span class="status ' + (i.paid?'paid':'unpaid') + '">' + (i.paid?'已付':'未付') + '</span></div>' +
+      '</div>';
     });
-    iv.innerHTML += '</div>';
+    html += '</div>';
+    iv.innerHTML = html;
+    
+    // Bind click events AFTER innerHTML is set
+    iv.querySelectorAll('.list-item').forEach(function(el) {
+      el.addEventListener('click', function(e) {
+        if (e.target.closest('.list-item-actions')) return;
+        var id = el.getAttribute('data-invoice-id');
+        viewInvoice(id);
+      });
+    });
   };
 
   console.log('[OHA Fix] Injected: viewInvoice, downloadInvoicePDF, sendInvoiceEmail, patched renderInvoices');
