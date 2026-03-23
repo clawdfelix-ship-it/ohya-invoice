@@ -559,7 +559,17 @@ function updateInvItem(idx, field, val) {
   const costTotal = (it.costJpy || 0) * (it.qty || 1) * rate;
   if (costTotal > 0 && margin < 100) { invItems[idx].price = costTotal / (1 - margin / 100) / (it.qty || 1); }
   else { invItems[idx].price = 0; }
-  renderInvItems();
+  
+  // 只更新該行的價格顯示和總計，不重新渲染整個表格
+  const row = document.getElementById('inv-items').children[idx];
+  const priceInput = row.querySelector('.profit-hkd');
+  if (priceInput && invItems[idx].price > 0) {
+    priceInput.value = '$' + invItems[idx].price.toFixed(2);
+  } else if (priceInput) {
+    priceInput.value = '';
+  }
+  
+  calcInvTotals();
 }
 
 function removeInvItem(idx) { invItems.splice(idx, 1); renderInvItems(); }
