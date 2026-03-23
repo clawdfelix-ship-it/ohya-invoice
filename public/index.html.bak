@@ -959,9 +959,44 @@ function viewInvoice(id) {
 }
 
 function downloadInvoicePDF(id) {
-  // 使用後端 API 生成專業 PDF
-  var url = API_BASE + "/api/invoices/" + encodeURIComponent(id) + "/pdf";
-  window.open(url, "_blank");
+  var inv = invoices.find(function(i){ return i.id === id; });
+  if (!inv) return;
+  var total = 0;
+  var rows = (inv.items || []).map(function(it) {
+    var qty = it.qty || 1;
+    var sale = qty * (it.price || 0);
+    total += sale;
+    return '<tr><td>' + escHtml(it.desc || '-') + '</td><td style="text-align:center">' + qty + '</td><td style="text-align:right">$' + (it.price || 0).toFixed(2) + '</td><td style="text-align:right">$' + sale.toFixed(2) + '</td></tr>';
+  }).join('');
+  var bg = inv.paid ? '#00d4aa' : '#ff6b6b';
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice ' + escHtml(inv.no || '') + '</title>' +
+    '<style>body{font-family:Arial,sans-serif;padding:40px;max-width:700px;margin:0 auto;color:#333}' +
+    '.hdr{margin-bottom:24px}.title{font-size:28px;font-weight:bold}.sub{color:#888;font-size:13px;margin-top:4px}' +
+    '.meta{margin:12px 0;font-size:14px;line-height:1.7}.bold{font-weight:bold}' +
+    'table{width:100%;border-collapse:collapse;margin-top:16px}' +
+    '.th{background:#f0f0f0;padding:8px 10px;text-align:left;font-size:12px;font-weight:bold}' +
+    '.td{padding:8px 10px;border-bottom:1px solid #eee;font-size:13px}' +
+    '.r{text-align:right}.totals{margin-top:16px;text-align:right}' +
+    '.tr{display:flex;justify-content:flex-end;gap:40px;padding:5px 0;border-bottom:1px solid #eee}' +
+    '.tl{color:#666;min-width:100px}.tv{font-weight:bold;min-width:100px}' +
+    '.badge{display:inline-block;padding:6px 14px;border-radius:20px;color:#fff;font-size:12px;font-weight:bold;margin-top:16px}' +
+    '</style></head><body>' +
+    '<div class="hdr"><div class="title">INVOICE</div><div class="sub">' + escHtml(inv.no || '') + '</div></div>' +
+    '<div class="meta"><span class="bold">' + escHtml(inv.client || '') + '</span>' +
+    (inv.client_email ? '<br>📧 ' + escHtml(inv.client_email) : '') +
+    (inv.client_address ? '<br>📍 ' + escHtml(inv.client_address) : '') +
+    '</div>' +
+    '<div class="meta">📅 日期: ' + escHtml(inv.date || '') + '</div>' +
+    '<table><thead><tr><th class="th">描述</th><th class="th r">數量</th><th class="th r">單價 (HKD)</th><th class="th r">合計</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    '<div class="totals">' +
+      '<div class="tr"><span class="tl">總銷售</span><span class="tv">$' + total.toFixed(2) + '</span></div>' +
+    '</div>' +
+    '<div><span class="badge" style="background:' + bg + '">' + (inv.paid ? 'PAID' : 'UNPAID') + '</span></div>' +
+    '</body></html>';
+  var w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+  setTimeout(function() { w.print(); }, 500);
 }
 
 function sendInvoiceEmail(id) {
