@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { db } from '../../../lib/db';
-import { invoices } from '../../../lib/schema';
+import { db } from '../../../../lib/db';
+import { invoices } from '../../../../lib/schema';
 import { eq } from 'drizzle-orm';
 import PDFDocument from 'pdfkit';
 
