@@ -2,8 +2,5 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "framework": "nextjs",
-  "regions": ["hkg1"],
-  "rewrites": [
-    { "source": "/", "destination": "/index.html", "check": true }
-  ]
+  "regions": ["hkg1"]
 }
