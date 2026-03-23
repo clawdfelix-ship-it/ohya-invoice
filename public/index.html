@@ -155,6 +155,7 @@ tr:hover{background:#1f1f35}
 <button class="tab active" data-view="dashboard">📊 總覽</button>
 <button class="tab" data-view="customers">👥 客戶</button>
 <button class="tab" data-view="invoices">📄 發票</button>
+<button class="tab" data-view="products">📦 產品</button>
 <button class="tab" data-view="records">💰 收支</button>
 </div>
 </div>
@@ -162,6 +163,7 @@ tr:hover{background:#1f1f35}
 <div id="view-dashboard"></div>
 <div id="view-customers" style="display:none"></div>
 <div id="view-invoices" style="display:none"></div>
+<div id="view-products" style="display:none"></div>
 <div id="view-records" style="display:none"></div>
 </div>
 
@@ -243,6 +245,31 @@ tr:hover{background:#1f1f35}
 </div>
 </div>
 
+<!-- Product Modal -->
+<div class="modal" id="modal-product">
+<div class="modal-content">
+<h2 id="product-modal-title">📦 新增產品</h2>
+<input type="hidden" id="edit-product-id">
+<div class="form-row">
+<div class="form-group"><label>產品名稱 *</label><input type="text" id="prod-name" placeholder="產品名稱"></div>
+<div class="form-group"><label>SKU</label><input type="text" id="prod-sku" placeholder="SKU 編號"></div>
+</div>
+<div class="form-row">
+<div class="form-group"><label>分類</label><input type="text" id="prod-category" placeholder="產品分類"></div>
+<div class="form-group"><label>JAN 條碼</label><input type="text" id="prod-jan" placeholder="49xxxxxxxxxxx"></div>
+</div>
+<div class="form-row">
+<div class="form-group"><label>成本 (JPY)</label><input type="number" id="prod-cost" placeholder="0" step="0.01"></div>
+<div class="form-group"><label>建議售價 (HKD)</label><input type="number" id="prod-price" placeholder="0" step="0.01"></div>
+</div>
+<div class="form-group"><label>備註</label><textarea id="prod-notes" rows="2" placeholder="其他備註..."></textarea></div>
+<div class="btn-row">
+<button class="btn btn-secondary" onclick="closeModal('product')">取消</button>
+<button class="btn btn-primary" onclick="saveProduct()">儲存</button>
+</div>
+</div>
+</div>
+
 <!-- Record Modal -->
 <div class="modal" id="modal-record">
 <div class="modal-content">
@@ -261,23 +288,37 @@ tr:hover{background:#1f1f35}
 </div>
 
 <script>
-const API = '';
+// API 配置：使用相對路徑（適用於 Vercel/Railway 同級部署）
+const API_BASE = window.location.origin;
 let customers = [], invoices = [], records = [], stats = {};
 let editingCustomerId = null;
 let invItems = [];
 let selectedInvoiceId = null;
 
 async function api(path, options = {}) {
-  const res = await fetch(API + path, options);
-  if (!res.ok) throw new Error(await res.text());
+  const url = API_BASE + path;
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    }
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `HTTP ${res.status}`);
+  }
   return res.json();
 }
 
+let products = [];
+
 async function loadData() {
-  [customers, invoices, records, stats] = await Promise.all([
+  [customers, invoices, records, products, stats] = await Promise.all([
     api('/api/customers'),
     api('/api/invoices'),
     api('/api/records'),
+    api('/api/products'),
     api('/api/stats')
   ]);
 }
@@ -290,6 +331,7 @@ function showView(name) {
   if (name === 'dashboard') renderDashboard();
   else if (name === 'customers') renderCustomers();
   else if (name === 'invoices') renderInvoices();
+  else if (name === 'products') renderProducts();
   else if (name === 'records') renderRecords();
 }
 
@@ -298,6 +340,17 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () =>
 function openModal(name) { document.getElementById(`modal-${name}`).classList.add('active'); }
 function closeModal(name) { document.getElementById(`modal-${name}`).classList.remove('active'); }
 document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); }));
+
+// Event delegation for invoice card clicks (avoids onclick attribute issues)
+document.addEventListener('click', function(e) {
+  var card = e.target.closest('.invoice-card-header');
+  if (card) {
+    var id = card.getAttribute('data-id');
+    if (id) {
+      toggleInvoice(id);
+    }
+  }
+});
 
 // Dashboard
 function renderDashboard() {
@@ -378,11 +431,39 @@ function editCustomer(id) {
 
 async function saveCustomer() {
   const name = document.getElementById('cust-name').value.trim();
-  if (!name) { alert('請輸入客戶名稱'); return; }
-  const c = { id: editingCustomerId || 'CUST-' + Date.now(), name, phone: document.getElementById('cust-phone').value.trim(), email: document.getElementById('cust-email').value.trim(), company: document.getElementById('cust-company').value.trim(), address: document.getElementById('cust-address').value.trim(), notes: document.getElementById('cust-notes').value.trim() };
-  if (editingCustomerId) { await api('/api/customers/' + editingCustomerId, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(c) }); }
-  else { await api('/api/customers', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(c) }); }
-  closeModal('customer'); await loadData(); renderCustomers();
+  if (!name) { alert('⚠️ 請輸入客戶名稱'); return; }
+  if (name.length > 200) { alert('⚠️ 客戶名稱不能超過 200 字元'); return; }
+  
+  const email = document.getElementById('cust-email').value.trim();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    alert('⚠️ 電郵格式不正確'); return;
+  }
+  
+  const phone = document.getElementById('cust-phone').value.trim();
+  if (phone && phone.length > 50) { alert('⚠️ 電話不能超過 50 字元'); return; }
+  
+  const c = {
+    id: editingCustomerId || 'CUST-' + Date.now(),
+    name,
+    phone,
+    email,
+    company: document.getElementById('cust-company').value.trim().slice(0, 200),
+    address: document.getElementById('cust-address').value.trim().slice(0, 1000),
+    notes: document.getElementById('cust-notes').value.trim().slice(0, 1000)
+  };
+  
+  try {
+    if (editingCustomerId) {
+      await api('/api/customers/' + editingCustomerId, { method: 'PUT', body: JSON.stringify(c) });
+    } else {
+      await api('/api/customers', { method: 'POST', body: JSON.stringify(c) });
+    }
+    closeModal('customer');
+    await loadData();
+    renderCustomers();
+  } catch (err) {
+    alert('❌ 儲存失敗：' + err.message);
+  }
 }
 
 async function deleteCustomer(id) { if (!confirm('確定刪除這個客戶？')) return; await api('/api/customers/' + id, { method: 'DELETE' }); await loadData(); renderCustomers(); }
@@ -411,7 +492,7 @@ function renderInvoices() {
         const total = (i.items || []).reduce((s,it) => s + (it.qty||1)*(it.price||0), 0);
         const isOpen = selectedInvoiceId === i.id;
         return `<div class="invoice-card ${isOpen ? 'open' : ''}" id="inv-card-${escAttr(i.id)}">
-          <div class="invoice-card-header" onclick="toggleInvoice('${escAttr(i.id)}')">
+          <div class="invoice-card-header" data-id="${escAttr(i.id)}">
             <div style="flex:1;min-width:0">
               <h3 style="font-size:14px;margin-bottom:4px">${escHtml(i.client || '-')} — ${escHtml(i.no || '-')}</h3>
               <p style="color:#888;font-size:12px">${escHtml(i.date || '-')} · ${i.items?.length || 0} 項目</p>
@@ -502,19 +583,73 @@ function calcInvTotals() {
 
 async function saveInvoice() {
   const client = document.getElementById('inv-client').value.trim();
-  if (!client) { alert('請輸入客戶名稱'); return; }
-  if (!invItems.length || !invItems.some(it => it.desc && it.price > 0)) { alert('請輸入最少一項'); return; }
+  if (!client) { alert('⚠️ 請輸入客戶名稱'); return; }
+  if (client.length > 200) { alert('⚠️ 客戶名稱不能超過 200 字元'); return; }
+  
+  if (!invItems.length || !invItems.some(it => it.desc && it.price > 0)) {
+    alert('⚠️ 請輸入最少一項有效項目'); return;
+  }
+  
+  // 驗證每個項目
+  for (let i = 0; i < invItems.length; i++) {
+    const it = invItems[i];
+    if (it.desc && it.desc.length > 500) {
+      alert(`⚠️ 項目 ${i+1} 描述太長（最多 500 字元）`); return;
+    }
+    if (it.costJpy < 0) {
+      alert(`⚠️ 項目 ${i+1} 成本不能為負數`); return;
+    }
+  }
+  
+  const email = document.getElementById('inv-email').value.trim();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    alert('⚠️ 電郵格式不正確'); return;
+  }
+  
   const margin = parseFloat(document.getElementById('inv-margin').value) || 0;
   const rate = parseFloat(document.getElementById('inv-rate').value) || 0.052;
-  const validItems = invItems.filter(it => it.desc && it.price > 0);
-  const inv = { id: 'INV-' + Date.now(), no: document.getElementById('inv-no').value, client, client_email: document.getElementById('inv-email').value.trim(), client_address: document.getElementById('inv-address').value.trim(), date: document.getElementById('inv-date').value, items: validItems, paid: false, margin, exchange_rate: rate };
+  
+  if (margin < 0 || margin >= 100) {
+    alert('⚠️ 利潤率必須在 0-99% 之間'); return;
+  }
+  if (rate <= 0) {
+    alert('⚠️ 匯率必須大於 0'); return;
+  }
+  
+  const validItems = invItems.filter(it => it.desc && it.price > 0).map(it => ({
+    desc: it.desc.slice(0, 500),
+    qty: it.qty || 1,
+    costJpy: it.costJpy || 0,
+    price: it.price || 0
+  }));
+  
+  const inv = {
+    id: 'INV-' + Date.now(),
+    no: document.getElementById('inv-no').value.slice(0, 50),
+    client,
+    client_email: email,
+    client_address: document.getElementById('inv-address').value.trim().slice(0, 1000),
+    date: document.getElementById('inv-date').value,
+    items: validItems,
+    paid: false,
+    margin,
+    exchange_rate: rate
+  };
+  
   localStorage.setItem('lastMargin', margin);
   localStorage.setItem('lastRate', rate);
-  await api('/api/invoices', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(inv) });
-  closeModal('invoice'); await loadData(); renderInvoices();
+  
+  try {
+    await api('/api/invoices', { method: 'POST', body: JSON.stringify(inv) });
+    closeModal('invoice');
+    await loadData();
+    renderInvoices();
+  } catch (err) {
+    alert('❌ 儲存失敗：' + err.message);
+  }
 }
 
-async function markInvoicePaid(id) { await api('/api/invoices/' + id + '/mark-paid', { method: 'POST' }); await loadData(); renderDashboard(); renderInvoices(); }
+async function markInvoicePaid(id) { await api('/api/invoices/' + id + '?action=mark-paid', { method: 'POST' }); await loadData(); renderDashboard(); renderInvoices(); }
 async function deleteInvoice(id) { if (!confirm('確定刪除這張發票？')) return; await api('/api/invoices/' + id, { method: 'DELETE' }); await loadData(); renderInvoices(); }
 
 // Records
@@ -539,12 +674,142 @@ function openNewRecord() { document.getElementById('rec-date').value = new Date(
 async function saveRecord() {
   const desc = document.getElementById('rec-desc').value.trim();
   const amount = parseFloat(document.getElementById('rec-amount').value);
-  if (!desc || !amount) { alert('請填寫所有欄位'); return; }
-  await api('/api/records', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id: 'REC-' + Date.now(), date: document.getElementById('rec-date').value, desc, type: document.getElementById('rec-type').value, amount }) });
-  closeModal('record'); await loadData(); renderRecords();
+  
+  if (!desc) { alert('⚠️ 請輸入項目描述'); return; }
+  if (desc.length > 500) { alert('⚠️ 描述不能超過 500 字元'); return; }
+  if (!amount || amount <= 0) { alert('⚠️ 金額必須大於 0'); return; }
+  if (amount > 1000000000) { alert('⚠️ 金額過大'); return; }
+  
+  const rec = {
+    id: 'REC-' + Date.now(),
+    date: document.getElementById('rec-date').value,
+    description: desc,
+    type: document.getElementById('rec-type').value,
+    amount
+  };
+  
+  try {
+    await api('/api/records', { method: 'POST', body: JSON.stringify(rec) });
+    closeModal('record');
+    await loadData();
+    renderRecords();
+  } catch (err) {
+    alert('❌ 儲存失敗：' + err.message);
+  }
 }
 
 async function deleteRecord(id) { if (!confirm('確定刪除？')) return; await api('/api/records/' + id, { method: 'DELETE' }); await loadData(); renderRecords(); }
+
+// Products
+let editingProductId = null;
+
+function renderProducts() {
+  const pv = document.getElementById('view-products');
+  pv.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <h2>產品列表 (${products.length})</h2>
+        <div style="display:flex;gap:8px">
+          <input type="text" class="search-input" placeholder="🔍 搜尋產品..." oninput="filterProducts(this.value)">
+          <button class="btn btn-primary" onclick="openNewProduct()">+ 新增產品</button>
+        </div>
+      </div>
+      <div id="products-list"></div>
+    </div>`;
+  renderProductsList(products);
+}
+
+function renderProductsList(list) {
+  const el = document.getElementById('products-list');
+  if (!list.length) { el.innerHTML = '<div class="empty">暫時沒有產品</div>'; return; }
+  el.innerHTML = list.map(p => `
+    <div class="list-item">
+      <div class="list-item-info">
+        <h3>${p.name} ${p.sku ? '<small style="color:#666;margin-left:8px">(' + p.sku + ')</small>' : ''}</h3>
+        <p>${p.category || ''} ${p.jan ? '| JAN: ' + p.jan : ''} | 成本：¥${Number(p.costJpy || 0).toLocaleString()} | 建議價：$${Number(p.suggestedPriceHkd || 0).toLocaleString()}</p>
+      </div>
+      <div class="list-item-actions">
+        <button class="btn btn-primary btn-sm" onclick="quickInvoiceFromProduct('${p.name.replace(/'/g, "\\'")}', ${p.costJpy || 0}, ${p.suggestedPriceHkd || 0})">開單</button>
+        <button class="btn btn-secondary btn-sm" onclick="editProduct('${p.id}')">編輯</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.id}')">刪除</button>
+      </div>
+    </div>`).join('');
+}
+
+function filterProducts(q) {
+  const filtered = products.filter(p => p.name.toLowerCase().includes(q.toLowerCase()) || (p.sku || '').toLowerCase().includes(q.toLowerCase()) || (p.category || '').toLowerCase().includes(q.toLowerCase()));
+  renderProductsList(filtered);
+}
+
+function openNewProduct() {
+  editingProductId = null;
+  document.getElementById('product-modal-title').textContent = '📦 新增產品';
+  ['name', 'sku', 'category', 'jan', 'cost', 'price', 'notes'].forEach(f => document.getElementById('prod-' + f).value = '');
+  openModal('product');
+}
+
+function editProduct(id) {
+  const p = products.find(x => x.id === id);
+  if (!p) return;
+  editingProductId = id;
+  document.getElementById('product-modal-title').textContent = '✏️ 編輯產品';
+  document.getElementById('prod-name').value = p.name || '';
+  document.getElementById('prod-sku').value = p.sku || '';
+  document.getElementById('prod-category').value = p.category || '';
+  document.getElementById('prod-jan').value = p.jan || '';
+  document.getElementById('prod-cost').value = p.costJpy || '';
+  document.getElementById('prod-price').value = p.suggestedPriceHkd || '';
+  document.getElementById('prod-notes').value = p.notes || '';
+  openModal('product');
+}
+
+async function saveProduct() {
+  const name = document.getElementById('prod-name').value.trim();
+  if (!name) { alert('⚠️ 請輸入產品名稱'); return; }
+  if (name.length > 200) { alert('⚠️ 產品名稱不能超過 200 字元'); return; }
+  
+  const costJpy = parseFloat(document.getElementById('prod-cost').value) || 0;
+  const suggestedPriceHkd = parseFloat(document.getElementById('prod-price').value) || 0;
+  
+  const prod = {
+    id: editingProductId || 'PROD-' + Date.now(),
+    name,
+    sku: document.getElementById('prod-sku').value.trim().slice(0, 50),
+    category: document.getElementById('prod-category').value.trim().slice(0, 100),
+    jan: document.getElementById('prod-jan').value.trim().slice(0, 50),
+    cost_jpy: costJpy,
+    suggested_price_hkd: suggestedPriceHkd,
+    notes: document.getElementById('prod-notes').value.trim().slice(0, 1000)
+  };
+  
+  try {
+    if (editingProductId) {
+      await api('/api/products/' + editingProductId, { method: 'PUT', body: JSON.stringify(prod) });
+    } else {
+      await api('/api/products', { method: 'POST', body: JSON.stringify(prod) });
+    }
+    closeModal('product');
+    await loadData();
+    renderProducts();
+  } catch (err) {
+    alert('❌ 儲存失敗：' + err.message);
+  }
+}
+
+async function deleteProduct(id) {
+  if (!confirm('確定刪除這個產品？')) return;
+  await api('/api/products/' + id, { method: 'DELETE' });
+  await loadData();
+  renderProducts();
+}
+
+function quickInvoiceFromProduct(name, costJpy, priceHkd) {
+  openNewInvoice();
+  document.getElementById('inv-client').value = '';
+  invItems = [{ desc: name, qty: 1, costJpy, price: priceHkd || 0 }];
+  renderInvItems();
+  openModal('invoice');
+}
 
 // Init
 loadData().then(function() {
@@ -558,7 +823,7 @@ loadData().then(function() {
 
 // ===== Order Card Accordion =====
 function toggleInvoice(id) {
-  var isCurrentlyOpen = selectedInvoiceId === id;
+  var isCurrentlyOpen = String(selectedInvoiceId) === String(id);
   if (isCurrentlyOpen) {
     selectedInvoiceId = null;
     history.pushState(null, '', window.location.pathname + window.location.search);
@@ -693,19 +958,13 @@ function viewInvoice(id) {
 function downloadInvoicePDF(id) {
   var inv = invoices.find(function(i){ return i.id === id; });
   if (!inv) return;
-  var rate = inv.exchange_rate || 0.052;
   var total = 0;
-  var totalCostJpy = 0;
   var rows = (inv.items || []).map(function(it) {
     var qty = it.qty || 1;
     var sale = qty * (it.price || 0);
     total += sale;
-    totalCostJpy += (it.costJpy || 0) * qty;
     return '<tr><td>' + escHtml(it.desc || '-') + '</td><td style="text-align:center">' + qty + '</td><td style="text-align:right">$' + (it.price || 0).toFixed(2) + '</td><td style="text-align:right">$' + sale.toFixed(2) + '</td></tr>';
   }).join('');
-  var totalCost = totalCostJpy * rate;
-  var profit = total - totalCost;
-  var margin = total > 0 ? (profit / total * 100).toFixed(1) : 0;
   var bg = inv.paid ? '#00d4aa' : '#ff6b6b';
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice ' + escHtml(inv.no || '') + '</title>' +
     '<style>body{font-family:Arial,sans-serif;padding:40px;max-width:700px;margin:0 auto;color:#333}' +
@@ -727,10 +986,7 @@ function downloadInvoicePDF(id) {
     '<div class="meta">📅 日期: ' + escHtml(inv.date || '') + '</div>' +
     '<table><thead><tr><th class="th">描述</th><th class="th r">數量</th><th class="th r">單價 (HKD)</th><th class="th r">合計</th></tr></thead><tbody>' + rows + '</tbody></table>' +
     '<div class="totals">' +
-      '<div class="tr"><span class="tl">總成本</span><span class="tv" style="color:#d4a000">¥' + totalCostJpy.toLocaleString() + '</span></div>' +
       '<div class="tr"><span class="tl">總銷售</span><span class="tv">$' + total.toFixed(2) + '</span></div>' +
-      '<div class="tr"><span class="tl">利潤</span><span class="tv" style="color:#00a080">$' + profit.toFixed(2) + '</span></div>' +
-      '<div class="tr"><span class="tl">利潤率</span><span class="tv" style="color:#4ecdc4">' + margin + '%</span></div>' +
     '</div>' +
     '<div><span class="badge" style="background:' + bg + '">' + (inv.paid ? 'PAID' : 'UNPAID') + '</span></div>' +
     '</body></html>';

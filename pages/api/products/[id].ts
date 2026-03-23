@@ -28,13 +28,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'PUT') {
       const { sku, name, category, cost_jpy, jan, suggested_price_hkd, notes } = req.body;
+      if (!name) {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        return res.status(400).end(JSON.stringify({ error: 'Product name is required' }));
+      }
       await db.update(products).set({
-        sku: sku || '', name, category: category || '',
-        costJpy: cost_jpy || 0, jan: jan || '',
-        suggestedPriceHkd: suggested_price_hkd || 0, notes: notes || '', updatedAt: new Date()
+        sku: sku || '',
+        name,
+        category: category || '',
+        costJpy: cost_jpy || 0,
+        jan: jan || '',
+        suggestedPriceHkd: suggested_price_hkd || 0,
+        notes: notes || '',
+        updatedAt: new Date()
       }).where(eq(products.id, id as string));
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      return res.end(JSON.stringify({ id, sku, name, category, cost_jpy, jan, suggested_price_hkd, notes }));
+      return res.end(JSON.stringify(req.body));
     }
 
     if (req.method === 'DELETE') {

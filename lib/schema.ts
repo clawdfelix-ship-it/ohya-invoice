@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, real, text, timestamp, integer } from 'drizzle-orm/pg-core';
+import { pgTable, serial, varchar, real, text, timestamp, integer, index, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const customers = pgTable('customers', {
   id: varchar('id', { length: 50 }).primaryKey(),
@@ -10,7 +10,10 @@ export const customers = pgTable('customers', {
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-});
+}, (table) => ({
+  nameIdx: index('customers_name_idx').on(table.name),
+  emailIdx: index('customers_email_idx').on(table.email),
+}));
 
 export const invoices = pgTable('invoices', {
   id: varchar('id', { length: 50 }).primaryKey(),
@@ -23,7 +26,12 @@ export const invoices = pgTable('invoices', {
   paid: integer('paid').default(0), // 0 = unpaid, 1 = paid
   exchangeRate: real('exchange_rate').default(0),
   createdAt: timestamp('created_at').defaultNow(),
-});
+}, (table) => ({
+  noIdx: index('invoices_no_idx').on(table.no),
+  clientIdx: index('invoices_client_idx').on(table.client),
+  dateIdx: index('invoices_date_idx').on(table.date),
+  paidIdx: index('invoices_paid_idx').on(table.paid),
+}));
 
 export const records = pgTable('records', {
   id: varchar('id', { length: 50 }).primaryKey(),
@@ -32,7 +40,10 @@ export const records = pgTable('records', {
   type: varchar('type', { length: 20 }).notNull(), // 'income' or 'expense'
   amount: real('amount').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
-});
+}, (table) => ({
+  dateIdx: index('records_date_idx').on(table.date),
+  typeIdx: index('records_type_idx').on(table.type),
+}));
 
 export const settings = pgTable('settings', {
   key: varchar('key', { length: 100 }).primaryKey(),
@@ -50,7 +61,12 @@ export const products = pgTable('products', {
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-});
+}, (table) => ({
+  skuIdx: index('products_sku_idx').on(table.sku),
+  nameIdx: index('products_name_idx').on(table.name),
+  categoryIdx: index('products_category_idx').on(table.category),
+  janIdx: index('products_jan_idx').on(table.jan),
+}));
 
 export type Customer = typeof customers.$inferSelect;
 export type NewCustomer = typeof customers.$inferInsert;

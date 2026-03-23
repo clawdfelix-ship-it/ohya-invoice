@@ -36,6 +36,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.end(JSON.stringify(req.body));
     }
 
+    if (req.method === 'POST') {
+      // Support mark-paid action: POST /api/invoices/[id]?action=mark-paid
+      const { action } = req.query;
+      if (action === 'mark-paid') {
+        await db.update(invoices).set({ paid: 1 })
+          .where(eq(invoices.id, id as string));
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        return res.end(JSON.stringify({ success: true }));
+      }
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      return res.status(405).end(JSON.stringify({ error: 'Method not allowed' }));
+    }
+
     if (req.method === 'DELETE') {
       await db.delete(invoices).where(eq(invoices.id, id as string));
       res.setHeader('Content-Type', 'application/json; charset=utf-8');

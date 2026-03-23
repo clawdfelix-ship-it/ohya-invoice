@@ -10,6 +10,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    if (req.method === 'GET') {
+      const { key } = req.query;
+      if (key) {
+        // Get single setting
+        const result = await db.select().from(settings).where(eq(settings.key, key as string)).limit(1);
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        return res.end(JSON.stringify(result[0] || { key, value: null }));
+      } else {
+        // Get all settings
+        const results = await db.select().from(settings);
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        return res.end(JSON.stringify(results));
+      }
+    }
+
     if (req.method === 'POST') {
       const { key, value } = req.body;
       if (!key) {

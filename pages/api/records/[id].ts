@@ -16,6 +16,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).end(JSON.stringify({ error: 'ID required' }));
     }
 
+    if (req.method === 'GET') {
+      const result = await db.select().from(records).where(eq(records.id, id as string)).limit(1);
+      if (!result.length) {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        return res.status(404).end(JSON.stringify({ error: 'Not found' }));
+      }
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      return res.end(JSON.stringify(result[0]));
+    }
+
     if (req.method === 'DELETE') {
       await db.delete(records).where(eq(records.id, id as string));
       res.setHeader('Content-Type', 'application/json; charset=utf-8');

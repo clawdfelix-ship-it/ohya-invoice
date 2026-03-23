@@ -16,6 +16,8 @@ export async function initializeDatabase() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+      CREATE INDEX IF NOT EXISTS customers_name_idx ON customers(name);
+      CREATE INDEX IF NOT EXISTS customers_email_idx ON customers(email);
     `);
 
     // Invoices table
@@ -32,6 +34,10 @@ export async function initializeDatabase() {
         exchange_rate REAL DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+      CREATE INDEX IF NOT EXISTS invoices_no_idx ON invoices(no);
+      CREATE INDEX IF NOT EXISTS invoices_client_idx ON invoices(client);
+      CREATE INDEX IF NOT EXISTS invoices_date_idx ON invoices(date);
+      CREATE INDEX IF NOT EXISTS invoices_paid_idx ON invoices(paid);
     `);
 
     // Records table
@@ -44,6 +50,8 @@ export async function initializeDatabase() {
         amount REAL NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+      CREATE INDEX IF NOT EXISTS records_date_idx ON records(date);
+      CREATE INDEX IF NOT EXISTS records_type_idx ON records(type);
     `);
 
     // Settings table
@@ -68,6 +76,10 @@ export async function initializeDatabase() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+      CREATE INDEX IF NOT EXISTS products_sku_idx ON products(sku);
+      CREATE INDEX IF NOT EXISTS products_name_idx ON products(name);
+      CREATE INDEX IF NOT EXISTS products_category_idx ON products(category);
+      CREATE INDEX IF NOT EXISTS products_jan_idx ON products(jan);
     `);
 
     console.log('✅ Database tables initialized successfully');
