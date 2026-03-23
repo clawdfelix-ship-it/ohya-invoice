@@ -56,7 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // 創建 PDF 文檔
     const doc = new PDFDocument({ 
       size: 'A4', 
-      margins: { top: 40, bottom: 40, left: 40, right: 40 } 
+      margins: { top: 50, bottom: 50, left: 50, right: 50 } 
     });
 
     // 設置響應頭
@@ -68,26 +68,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const pageWidth = doc.page.width;
     const pageHeight = doc.page.height;
-    const contentWidth = pageWidth - 80;
+    const contentWidth = pageWidth - 100;
 
     // ===== 頁眉 - 發票標題 =====
-    doc.fontSize(28).font('Helvetica-Bold').fillColor('#1a1a2e').text('INVOICE', pageWidth - 40 - 150, 40, { width: 150, align: 'right' });
+    doc.fontSize(24).font('Helvetica-Bold').text('INVOICE', pageWidth - 50 - 120, 50, { width: 120, align: 'right' });
     
     // 發票編號和日期
-    doc.fontSize(11).font('Helvetica').fillColor('#666').text(`Invoice No: ${invoice.no}`, pageWidth - 40 - 150, 70, { width: 150, align: 'right' });
-    doc.text(`Date: ${invoice.date}`, pageWidth - 40 - 150, 85, { width: 150, align: 'right' });
+    doc.fontSize(10).font('Helvetica').text(`Invoice No: ${invoice.no}`, pageWidth - 50 - 120, 75, { width: 120, align: 'right' });
+    doc.text(`Date: ${invoice.date}`, pageWidth - 50 - 120, 88, { width: 120, align: 'right' });
     
     // 分隔線
-    doc.moveTo(40, 105).lineTo(pageWidth - 40, 105).strokeColor('#e0e0e0').lineWidth(2).stroke();
+    doc.moveTo(50, 100).lineTo(pageWidth - 50, 100).strokeColor('#000').lineWidth(1).stroke();
 
     // ===== 客戶信息 =====
-    doc.fontSize(12).font('Helvetica-Bold').fillColor('#1a1a2e').text('Bill To:', 40, 125);
-    doc.fontSize(11).font('Helvetica').fillColor('#333').text(invoice.client, 40, 145, { width: 300 });
+    doc.fontSize(10).font('Helvetica-Bold').text('Bill To:', 50, 120);
+    doc.fontSize(10).font('Helvetica').text(invoice.client, 50, 135, { width: 300 });
     if (invoice.clientEmail) {
-      doc.fillColor('#666').text(invoice.clientEmail, 40, 162, { width: 300 });
+      doc.text(invoice.clientEmail, 50, 148, { width: 300 });
     }
     if (invoice.clientAddress) {
-      doc.fillColor('#666').text(invoice.clientAddress, 40, 179, { width: 300 });
+      doc.text(invoice.clientAddress, 50, 161, { width: 300 });
     }
 
     // ===== 項目表格 =====
