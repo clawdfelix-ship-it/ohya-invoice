@@ -312,14 +312,14 @@ function renderDashboard() {
     <div class="card">
       <h2>📄 未付款發票 (${unpaid.length})</h2>
       ${unpaid.length ? unpaid.map(i => `
-        <div class="list-item">
+        <div class="list-item" onclick="viewInvoice('${i.id}')">
           <div class="list-item-info">
             <h3>${i.client} - ${i.no}</h3>
             <p>${i.date} | ${i.items?.length || 0} 項目</p>
           </div>
           <div class="list-item-actions">
             <span class="status unpaid">未付 $${(i.items?.reduce((s,it) => s + it.qty * it.price, 0) || 0).toLocaleString()}</span>
-            <button class="btn btn-primary btn-sm" onclick="markInvoicePaid('${i.id}')">設為已付</button>
+            <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); markInvoicePaid('${i.id}')">設為已付</button>
           </div>
         </div>`).join('') : '<div class="empty">沒有未付款發票 🎉</div>'}
     </div>`;
