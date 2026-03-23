@@ -56,7 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // 創建 PDF 文檔
     const doc = new PDFDocument({ 
       size: 'A4', 
-      margins: { top: 50, bottom: 50, left: 50, right: 50 } 
+      margins: { top: 40, bottom: 40, left: 40, right: 40 } 
     });
 
     // 設置響應頭
@@ -66,102 +66,122 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // 將 PDF 流式傳輸到響應
     doc.pipe(res);
 
-    // ===== 頁眉 =====
-    doc.fontSize(24).font('Helvetica-Bold').text('INVOICE', { align: 'right' });
-    doc.moveDown(0.5);
-    doc.fontSize(12).font('Helvetica').text(`Invoice No: ${invoice.no}`, { align: 'right' });
-    doc.text(`Date: ${invoice.date}`, { align: 'right' });
+    const pageWidth = doc.page.width;
+    const pageHeight = doc.page.height;
+    const contentWidth = pageWidth - 80;
+
+    // ===== 頁眉 - 發票標題 =====
+    doc.fontSize(28).font('Helvetica-Bold').fillColor('#1a1a2e').text('INVOICE', pageWidth - 40 - 150, 40, { width: 150, align: 'right' });
     
-    doc.moveDown(2);
+    // 發票編號和日期
+    doc.fontSize(11).font('Helvetica').fillColor('#666').text(`Invoice No: ${invoice.no}`, pageWidth - 40 - 150, 70, { width: 150, align: 'right' });
+    doc.text(`Date: ${invoice.date}`, pageWidth - 40 - 150, 85, { width: 150, align: 'right' });
+    
+    // 分隔線
+    doc.moveTo(40, 105).lineTo(pageWidth - 40, 105).strokeColor('#e0e0e0').lineWidth(2).stroke();
 
     // ===== 客戶信息 =====
-    doc.fontSize(14).font('Helvetica-Bold').text('Bill To:', { underline: true });
-    doc.moveDown(0.5);
-    doc.fontSize(12).font('Helvetica').text(invoice.client);
+    doc.fontSize(12).font('Helvetica-Bold').fillColor('#1a1a2e').text('Bill To:', 40, 125);
+    doc.fontSize(11).font('Helvetica').fillColor('#333').text(invoice.client, 40, 145, { width: 300 });
     if (invoice.clientEmail) {
-      doc.text(invoice.clientEmail);
+      doc.fillColor('#666').text(invoice.clientEmail, 40, 162, { width: 300 });
     }
     if (invoice.clientAddress) {
-      doc.text(invoice.clientAddress);
+      doc.fillColor('#666').text(invoice.clientAddress, 40, 179, { width: 300 });
     }
-    
-    doc.moveDown(2);
 
     // ===== 項目表格 =====
-    const tableTop = doc.y;
-    const tableLeft = 50;
-    const colWidths = { desc: 250, qty: 60, cost: 80, price: 80, total: 80 };
+    const tableTop = 220;
+    const tableLeft = 40;
+    const colWidths = { desc: 280, qty: 60, cost: 90, price: 90, total: 90 };
+    const rowHeight = 25;
 
+    // 表格標題背景
+    doc.rect(tableLeft, tableTop, contentWidth, rowHeight).fillColor('#f5f5f5');
+    
     // 表格標題
-    doc.font('Helvetica-Bold').fontSize(10);
-    doc.text('Description', tableLeft, tableTop, { width: colWidths.desc });
-    doc.text('Qty', tableLeft + colWidths.desc, tableTop, { width: colWidths.qty, align: 'center' });
-    doc.text('Cost (JPY)', tableLeft + colWidths.desc + colWidths.qty, tableTop, { width: colWidths.cost, align: 'right' });
-    doc.text('Price (HKD)', tableLeft + colWidths.desc + colWidths.qty + colWidths.cost, tableTop, { width: colWidths.price, align: 'right' });
-    doc.text('Total (HKD)', tableLeft + colWidths.desc + colWidths.qty + colWidths.cost + colWidths.price, tableTop, { width: colWidths.total, align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#333');
+    doc.text('Description', tableLeft + 5, tableTop + 7, { width: colWidths.desc - 10 });
+    doc.text('Qty', tableLeft + colWidths.desc, tableTop + 7, { width: colWidths.qty, align: 'center' });
+    doc.text('Cost (JPY)', tableLeft + colWidths.desc + colWidths.qty, tableTop + 7, { width: colWidths.cost - 10, align: 'right' });
+    doc.text('Price (HKD)', tableLeft + colWidths.desc + colWidths.qty + colWidths.cost, tableTop + 7, { width: colWidths.price - 10, align: 'right' });
+    doc.text('Total (HKD)', tableLeft + colWidths.desc + colWidths.qty + colWidths.cost + colWidths.price, tableTop + 7, { width: colWidths.total - 10, align: 'right' });
 
     // 表格標題底線
-    doc.moveTo(tableLeft, tableTop + 15)
-       .lineTo(tableLeft + Object.values(colWidths).reduce((a, b) => a + b, 0), tableTop + 15)
-       .stroke();
+    doc.moveTo(tableLeft, tableTop + rowHeight).lineTo(tableLeft + contentWidth, tableTop + rowHeight).strokeColor('#ddd').lineWidth(1).stroke();
 
     // 表格內容
     doc.font('Helvetica').fontSize(10);
-    let yPos = tableTop + 25;
+    let yPos = tableTop + rowHeight;
 
-    items.forEach((item: any) => {
+    items.forEach((item: any, index: number) => {
       const qty = item.qty || 1;
       const costJpy = item.costJpy || 0;
       const price = item.price || 0;
       const total = qty * price;
+      const bgColor = index % 2 === 0 ? '#ffffff' : '#fafafa';
+      
+      // 行背景
+      doc.rect(tableLeft, yPos, contentWidth, rowHeight).fillColor(bgColor);
+      
+      doc.fillColor('#333');
+      doc.text(item.desc || '-', tableLeft + 5, yPos + 7, { width: colWidths.desc - 10 });
+      doc.text(String(qty), tableLeft + colWidths.desc, yPos + 7, { width: colWidths.qty, align: 'center' });
+      doc.text(`¥${costJpy.toLocaleString()}`, tableLeft + colWidths.desc + colWidths.qty, yPos + 7, { width: colWidths.cost - 10, align: 'right' });
+      doc.text(`$${price.toFixed(2)}`, tableLeft + colWidths.desc + colWidths.qty + colWidths.cost, yPos + 7, { width: colWidths.price - 10, align: 'right' });
+      doc.text(`$${total.toFixed(2)}`, tableLeft + colWidths.desc + colWidths.qty + colWidths.cost + colWidths.price, yPos + 7, { width: colWidths.total - 10, align: 'right' });
 
-      doc.text(item.desc || '-', tableLeft, yPos, { width: colWidths.desc });
-      doc.text(String(qty), tableLeft + colWidths.desc, yPos, { width: colWidths.qty, align: 'center' });
-      doc.text(`¥${costJpy.toLocaleString()}`, tableLeft + colWidths.desc + colWidths.qty, yPos, { width: colWidths.cost, align: 'right' });
-      doc.text(`$${price.toFixed(2)}`, tableLeft + colWidths.desc + colWidths.qty + colWidths.cost, yPos, { width: colWidths.price, align: 'right' });
-      doc.text(`$${total.toFixed(2)}`, tableLeft + colWidths.desc + colWidths.qty + colWidths.cost + colWidths.price, yPos, { width: colWidths.total, align: 'right' });
-
-      yPos += 20;
+      // 行底線
+      doc.moveTo(tableLeft, yPos + rowHeight).lineTo(tableLeft + contentWidth, yPos + rowHeight).strokeColor('#eee').lineWidth(1).stroke();
+      
+      yPos += rowHeight;
     });
 
-    // 表格底線
-    doc.moveTo(tableLeft, yPos)
-       .lineTo(tableLeft + Object.values(colWidths).reduce((a, b) => a + b, 0), yPos)
-       .stroke();
-
     // ===== 總計 =====
-    doc.moveDown(1);
-    const totalsRight = tableLeft + Object.values(colWidths).reduce((a, b) => a + b, 0);
-    
+    const totalsStartY = yPos + 20;
+    const totalsRight = pageWidth - 40;
+    const totalsWidth = 250;
+    const totalsLeft = totalsRight - totalsWidth;
+
     doc.font('Helvetica').fontSize(11);
-    doc.text('Total Cost (JPY):', totalsRight - colWidths.total - colWidths.price, yPos + 10, { width: colWidths.desc + colWidths.qty + colWidths.cost, align: 'right' });
-    doc.text(`¥${totalCostJpy.toLocaleString()}`, totalsRight - colWidths.total, yPos + 10, { width: colWidths.price, align: 'right' });
+    
+    // 總成本
+    doc.fillColor('#666').text('Total Cost (JPY):', totalsLeft, totalsStartY, { width: 150, align: 'right' });
+    doc.fillColor('#333').text(`¥${totalCostJpy.toLocaleString()}`, totalsLeft + 155, totalsStartY, { width: 95, align: 'right' });
 
-    doc.text('Total Sales (HKD):', totalsRight - colWidths.total - colWidths.price, yPos + 30, { width: colWidths.desc + colWidths.qty + colWidths.cost, align: 'right' });
-    doc.text(`$${totalSale.toFixed(2)}`, totalsRight - colWidths.total, yPos + 30, { width: colWidths.price, align: 'right' });
+    // 總銷售
+    doc.fillColor('#666').text('Total Sales (HKD):', totalsLeft, totalsStartY + 20, { width: 150, align: 'right' });
+    doc.fillColor('#333').text(`$${totalSale.toFixed(2)}`, totalsLeft + 155, totalsStartY + 20, { width: 95, align: 'right' });
 
-    doc.font('Helvetica-Bold').text('Total Profit (HKD):', totalsRight - colWidths.total - colWidths.price, yPos + 50, { width: colWidths.desc + colWidths.qty + colWidths.cost, align: 'right' });
-    doc.text(`$${totalProfit.toFixed(2)}`, totalsRight - colWidths.total, yPos + 50, { width: colWidths.price, align: 'right' });
+    // 分隔線
+    doc.moveTo(totalsLeft, totalsStartY + 45).lineTo(totalsRight, totalsStartY + 45).strokeColor('#ddd').lineWidth(1).stroke();
 
-    doc.text(`Profit Margin: ${margin}%`, totalsRight - colWidths.total - colWidths.price, yPos + 70, { width: colWidths.desc + colWidths.qty + colWidths.cost, align: 'right' });
+    // 總利潤（粗體）
+    doc.font('Helvetica-Bold').fillColor('#1a1a2e').text('Total Profit (HKD):', totalsLeft, totalsStartY + 55, { width: 150, align: 'right' });
+    doc.fillColor('#00d4aa').text(`$${totalProfit.toFixed(2)}`, totalsLeft + 155, totalsStartY + 55, { width: 95, align: 'right' });
+
+    // 利潤率
+    doc.font('Helvetica').fillColor('#666').text('Profit Margin:', totalsLeft, totalsStartY + 75, { width: 150, align: 'right' });
+    doc.fillColor('#00d4aa').text(`${margin}%`, totalsLeft + 155, totalsStartY + 75, { width: 95, align: 'right' });
 
     // ===== 付款狀態 =====
-    doc.moveDown(2);
-    const statusY = doc.y;
+    const statusY = totalsStartY + 110;
+    const statusWidth = 120;
+    const statusHeight = 35;
+    const statusX = totalsRight - statusWidth;
     const statusColor = invoice.paid ? '#00d4aa' : '#ff6b6b';
     const statusText = invoice.paid ? 'PAID' : 'UNPAID';
     
-    doc.rect(totalsRight - 100, statusY, 100, 30);
-    doc.fillColor(statusColor).fill();
-    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(14).text(statusText, totalsRight - 100, statusY + 8, { width: 100, align: 'center' });
+    // 狀態背景矩形
+    doc.rect(statusX, statusY, statusWidth, statusHeight).fillColor(statusColor);
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(14).text(statusText, statusX, statusY + 10, { width: statusWidth, align: 'center' });
 
     // ===== 頁腳 =====
-    const pageHeight = doc.page.height;
-    doc.fontSize(9).font('Helvetica').fillColor('#666').text(
+    doc.fontSize(9).font('Helvetica').fillColor('#999').text(
       'Thank you for your business!',
-      50,
-      pageHeight - 50,
-      { width: 500, align: 'center' }
+      40,
+      pageHeight - 40,
+      { width: contentWidth, align: 'center' }
     );
 
     // 結束 PDF
