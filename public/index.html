@@ -98,6 +98,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 .item-row .profit-hkd{color:#00d4aa!important;border-style:dashed!important;border-color:#00d4aa44!important;font-weight:600}
 .item-row .margin-pct{color:#4ecdc4!important;border-color:#4ecdc4!important}
 .item-row input[readonly]{background:#1a1a2e}
+/* 隱藏 number input 的 spin buttons */
+.item-row input[type=number]::-webkit-inner-spin-button,.item-row input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.item-row input[type=number]{-moz-appearance:textfield}
 .summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}
 .summary-card{background:#0f0f23;border-radius:8px;padding:10px;text-align:center}
 .summary-card .sc-label{color:#888;font-size:11px}
@@ -212,11 +215,11 @@ tr:hover{background:#1f1f35}
 <div class="form-row" style="margin-bottom:12px">
 <div class="form-group" style="margin-bottom:0">
 <label style="color:#00d4aa;font-weight:600">統一利潤率 (%)</label>
-<input type="number" id="inv-margin" placeholder="例：15" step="0.1" value="10" style="border-color:#00d4aa" oninput="applyUnifiedMargin()">
+<input type="text" inputmode="decimal" id="inv-margin" placeholder="例：15" value="10" style="border-color:#00d4aa;text-align:right" oninput="applyUnifiedMargin()" onwheel="(function(e){e.preventDefault();e.target.blur();}).call(this,event)">
 </div>
 <div class="form-group" style="margin-bottom:0">
 <label style="color:#888">匯率 (1 JPY = ? HKD)</label>
-<input type="number" id="inv-rate" placeholder="0.052" step="0.0001" value="0.052" style="border-color:#4ecdc4" oninput="applyUnifiedMargin()">
+<input type="text" inputmode="decimal" id="inv-rate" placeholder="0.052" value="0.052" style="border-color:#4ecdc4;text-align:right" oninput="applyUnifiedMargin()" onwheel="(function(e){e.preventDefault();e.target.blur();}).call(this,event)">
 </div>
 </div>
 <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:6px;margin-bottom:8px;font-size:11px;color:#666;font-weight:600">
@@ -535,8 +538,8 @@ function renderInvItems() {
     if (costTotal > 0 && unifiedMargin < 100) { price = costTotal / (1 - unifiedMargin / 100) / (it.qty || 1); }
     return `<div class="item-row">
       <input type="text" placeholder="項目描述" value="${it.desc || ''}" oninput="updateInvItem(${idx}, 'desc', this.value)">
-      <input type="number" placeholder="數量" value="${it.qty || 1}" style="width:60px" oninput="updateInvItem(${idx}, 'qty', this.value)">
-      <input type="number" placeholder="成本 (JPY)" class="cost-jpy" value="${it.costJpy || ''}" oninput="updateInvItem(${idx}, 'costJpy', this.value)">
+      <input type="text" inputmode="decimal" placeholder="數量" value="${it.qty || 1}" style="width:60px;text-align:center" oninput="updateInvItem(${idx}, 'qty', this.value)" onwheel="(function(e){e.preventDefault();e.target.blur();}).call(this,event)">
+      <input type="text" inputmode="decimal" placeholder="成本 (JPY)" class="cost-jpy" value="${it.costJpy || ''}" style="text-align:right" oninput="updateInvItem(${idx}, 'costJpy', this.value)" onwheel="(function(e){e.preventDefault();e.target.blur();}).call(this,event)">
       <input type="text" placeholder="$0" class="profit-hkd" value="${price > 0 ? '$' + price.toFixed(2) : ''}" readonly>
       <button class="btn btn-danger btn-sm" onclick="removeInvItem(${idx})">✕</button>
     </div>`;
