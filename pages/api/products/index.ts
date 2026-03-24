@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { db } from '../../../lib/db';
 import { products } from '../../../lib/schema';
-import { like } from 'drizzle-orm';
+import { like, or } from 'drizzle-orm';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!db) {
@@ -20,16 +20,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       let total;
       
       if (q) {
-        // 搜尋產品
+        // 搜尋產品：支持產品名稱 或 JAN Code
+        const searchCondition = or(
+          like(products.name, `%${q}%`),
+          like(products.jan, `%${q}%`)
+        );
+        
         results = await db.select().from(products)
-          .where(like(products.name, `%${q}%`))
+          .where(searchCondition)
           .limit(limitNum)
           .offset(offset)
           .orderBy(products.name);
         
         // 獲取總數
         const allProducts = await db.select().from(products)
-          .where(like(products.name, `%${q}%`));
+          .where(searchCondition);
         total = allProducts.length;
       } else {
         // 獲取所有產品（分頁）
