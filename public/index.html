@@ -942,7 +942,19 @@ async function editInvoice(id) {
   }
   
   editingInvoiceId = id;
-  invItems = JSON.parse(invoice.items || '[]');
+  
+  // items 可能係字符串、數組、或對象，需要正確處理
+  if (Array.isArray(invoice.items)) {
+    invItems = invoice.items;
+  } else if (typeof invoice.items === 'string') {
+    try {
+      invItems = JSON.parse(invoice.items);
+    } catch (e) {
+      invItems = [];
+    }
+  } else {
+    invItems = [];
+  }
   
   document.getElementById('inv-no').value = invoice.no || '';
   document.getElementById('inv-client').value = invoice.client || '';
