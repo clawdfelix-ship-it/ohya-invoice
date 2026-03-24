@@ -935,27 +935,14 @@ function selectProductForInvoice(name, costJpy, priceHkd) {
 let editingInvoiceId = null;
 
 async function editInvoice(id) {
-  console.log('editInvoice called with id:', id);
-  console.log('invoices array:', invoices);
-  console.log('invoices length:', invoices ? invoices.length : 'undefined');
-  
-  const invoice = invoices ? invoices.find(i => i.id === id) : null;
+  const invoice = invoices.find(i => i.id === id);
   if (!invoice) {
-    console.error('Invoice not found:', id);
-    alert('❌ 找不到發票\n\n請刷新頁面重試');
+    alert('❌ 找不到發票');
     return;
   }
   
-  console.log('Found invoice:', invoice);
-  
   editingInvoiceId = id;
-  
-  // items 可能係字符串或對象，需要處理
-  if (typeof invoice.items === 'string') {
-    invItems = JSON.parse(invoice.items);
-  } else {
-    invItems = invoice.items || [];
-  }
+  invItems = JSON.parse(invoice.items || '[]');
   
   document.getElementById('inv-no').value = invoice.no || '';
   document.getElementById('inv-client').value = invoice.client || '';
@@ -965,29 +952,8 @@ async function editInvoice(id) {
   document.getElementById('inv-margin').value = (invoice.margin !== undefined ? invoice.margin : 10);
   document.getElementById('inv-rate').value = (invoice.exchangeRate !== undefined ? invoice.exchangeRate : 0.052);
   
-  // 更新表單標題
-  document.getElementById('invoice-modal-title').textContent = '✏️ 編輯發票';
-  
   renderInvItems();
-  
-  // 確保 modal 正確顯示
-  const modal = document.getElementById('modal-invoice');
-  console.log('Modal element:', modal);
-  console.log('Modal classList before:', modal ? modal.classList : 'null');
-  
-  if (modal) {
-    modal.classList.add('active');
-    console.log('Modal classList after:', modal.classList);
-  } else {
-    console.error('Modal element not found!');
-  }
-  
-  // 確保 modal 正確顯示
-  const modal = document.getElementById('modal-invoice');
-  if (modal) {
-    modal.classList.add('active');
-    modal.style.display = 'flex';
-  }
+  openModal('invoice');
 }
 
 async function saveInvoice() {
@@ -1071,10 +1037,6 @@ function openNewInvoice() {
   document.getElementById('inv-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('inv-margin').value = localStorage.getItem('lastMargin') || '10';
   document.getElementById('inv-rate').value = localStorage.getItem('lastRate') || '0.052';
-  
-  // 更新表單標題
-  document.getElementById('invoice-modal-title').textContent = '📄 新增發票';
-  
   renderInvItems(); 
   openModal('invoice');
 }
@@ -1237,20 +1199,6 @@ function sendInvoiceEmail(id) {
   var body = '您好,\n\n請查閱附件中的發票\n\n發票編號: ' + (inv.no || '') + '\n日期: ' + (inv.date || '') + '\n金額: $' + total.toFixed(2) + '\n\n謝謝';
   window.open('mailto:' + encodeURIComponent(email) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body), '_blank');
 }
-
-// 頁面初始化：載入數據
-document.addEventListener('DOMContentLoaded', async function() {
-  try {
-    await loadData();
-    renderDashboard();
-    renderInvoices();
-    renderCustomers();
-    renderProducts();
-    renderRecords();
-  } catch (err) {
-    console.error('Failed to load data:', err);
-  }
-});
 
 </script>
 </body>
