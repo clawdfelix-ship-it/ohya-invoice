@@ -222,6 +222,16 @@ tr:hover{background:#1f1f35}
 <input type="text" inputmode="decimal" id="inv-rate" placeholder="0.052" value="0.052" style="border-color:#4ecdc4;text-align:right" oninput="applyUnifiedMargin()" onwheel="(function(e){e.preventDefault();e.target.blur();}).call(this,event)">
 </div>
 </div>
+
+<!-- 產品搜尋 -->
+<div class="form-group" style="margin-bottom:12px">
+<label style="color:#888">📦 搜尋產品（可選）</label>
+<div style="position:relative">
+  <input type="text" id="inv-product-search" placeholder="輸入產品名稱搜尋..." style="width:100%" oninput="searchProductsForInvoice(this.value)">
+  <div id="inv-product-results" style="position:absolute;top:100%;left:0;right:0;background:#1a1a2e;border:1px solid #333;border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;display:none"></div>
+</div>
+</div>
+
 <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:6px;margin-bottom:8px;font-size:11px;color:#666;font-weight:600">
 <div>項目描述</div><div>數量</div><div>成本 (JPY)</div><div>售價 (HKD)</div><div></div>
 </div>
@@ -501,6 +511,8 @@ function renderInvoices() {
               <p style="color:#888;font-size:12px">${escHtml(i.date || '-')} · ${i.items?.length || 0} 項目</p>
             </div>
             <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+              <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();editInvoice('${i.id}')" title="編輯發票">✏️</button>
+              <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();downloadInvoicePDF('${i.id}')" title="下載 PDF">📥</button>
               <span style="font-weight:600;font-size:14px">$${total.toLocaleString()}</span>
               <span class="status ${i.paid ? 'paid' : 'unpaid'}">${i.paid ? '已付' : '未付'}</span>
               <span class="inv-chevron">▼</span>
@@ -559,7 +571,17 @@ function updateInvItem(idx, field, val) {
   const costTotal = (it.costJpy || 0) * (it.qty || 1) * rate;
   if (costTotal > 0 && margin < 100) { invItems[idx].price = costTotal / (1 - margin / 100) / (it.qty || 1); }
   else { invItems[idx].price = 0; }
-  renderInvItems();
+  
+  // 只更新該行的價格顯示和總計，不重新渲染整個表格
+  const row = document.getElementById('inv-items').children[idx];
+  const priceInput = row.querySelector('.profit-hkd');
+  if (priceInput && invItems[idx].price > 0) {
+    priceInput.value = '$' + invItems[idx].price.toFixed(2);
+  } else if (priceInput) {
+    priceInput.value = '';
+  }
+  
+  calcInvTotals();
 }
 
 function removeInvItem(idx) { invItems.splice(idx, 1); renderInvItems(); }
@@ -706,20 +728,56 @@ async function deleteRecord(id) { if (!confirm('確定刪除？')) return; await
 // Products
 let editingProductId = null;
 
-function renderProducts() {
+let currentPage = 1;
+const productsPerPage = 50;
+let totalProducts = 0;
+let searchQuery = '';
+
+async function renderProducts(page = 1, search = '') {
   const pv = document.getElementById('view-products');
-  pv.innerHTML = `
-    <div class="card">
-      <div class="card-header">
-        <h2>產品列表 (${products.length})</h2>
-        <div style="display:flex;gap:8px">
-          <input type="text" class="search-input" placeholder="🔍 搜尋產品..." oninput="filterProducts(this.value)">
-          <button class="btn btn-primary" onclick="openNewProduct()">+ 新增產品</button>
+  
+  try {
+    const url = search 
+      ? `/api/products?q=${encodeURIComponent(search)}&page=${page}&limit=${productsPerPage}`
+      : `/api/products?page=${page}&limit=${productsPerPage}`;
+    
+    const data = await api(url);
+    products = data.products || [];
+    totalProducts = data.total || 0;
+    currentPage = data.page || 1;
+    const totalPages = data.totalPages || 1;
+    
+    pv.innerHTML = `
+      <div class="card">
+        <div class="card-header">
+          <h2>產品列表 (${totalProducts})</h2>
+          <div style="display:flex;gap:8px">
+            <input type="text" class="search-input" placeholder="🔍 搜尋產品..." value="${search}" oninput="debounceSearch(this.value)">
+            <button class="btn btn-primary" onclick="openNewProduct()">+ 新增產品</button>
+          </div>
         </div>
-      </div>
-      <div id="products-list"></div>
-    </div>`;
-  renderProductsList(products);
+        <div id="products-list"></div>
+        ${totalPages > 1 ? `
+          <div class="pagination" style="display:flex;justify-content:center;gap:8px;margin-top:16px;align-items:center">
+            <button class="btn btn-sm btn-secondary" onclick="renderProducts(${currentPage - 1}, '${search}')" ${currentPage <= 1 ? 'disabled' : ''}>◀ 上一頁</button>
+            <span style="color:#888;font-size:14px">第 ${currentPage} / ${totalPages} 頁</span>
+            <button class="btn btn-sm btn-secondary" onclick="renderProducts(${currentPage + 1}, '${search}')" ${currentPage >= totalPages ? 'disabled' : ''}>下一頁 ▶</button>
+          </div>
+        ` : ''}
+      </div>`;
+    renderProductsList(products);
+  } catch (err) {
+    pv.innerHTML = `<div class="card"><div class="empty">載入失敗：${err.message}</div></div>`;
+  }
+}
+
+let searchTimeout;
+function debounceSearch(value) {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    searchQuery = value.trim();
+    renderProducts(1, searchQuery);
+  }, 300);
 }
 
 function renderProductsList(list) {
@@ -814,7 +872,193 @@ function quickInvoiceFromProduct(name, costJpy, priceHkd) {
   openModal('invoice');
 }
 
-// Init
+// 發票中搜尋產品
+let productSearchTimeout;
+async function searchProductsForInvoice(query) {
+  clearTimeout(productSearchTimeout);
+  const resultsEl = document.getElementById('inv-product-results');
+  
+  if (!query || query.length < 2) {
+    resultsEl.style.display = 'none';
+    return;
+  }
+  
+  productSearchTimeout = setTimeout(async () => {
+    try {
+      const results = await api(`/api/products?q=${encodeURIComponent(query)}&limit=10`);
+      const products = results.products || [];
+      
+      if (products.length === 0) {
+        resultsEl.style.display = 'none';
+        return;
+      }
+      
+      resultsEl.innerHTML = products.map(p => `
+        <div style="padding:8px;cursor:pointer;border-bottom:1px solid #252540:hover;background:#252540" 
+             onclick="selectProductForInvoice('${p.name.replace(/'/g, "\\'")}', ${p.costJpy || 0}, ${p.suggestedPriceHkd || 0})">
+          <div style="font-weight:600">${p.name}</div>
+          <div style="font-size:12px;color:#888">
+            ${p.sku ? 'SKU: ' + p.sku + ' | ' : ''}
+            成本：¥${(p.costJpy || 0).toLocaleString()} | 
+            售價：$${(p.suggestedPriceHkd || 0).toLocaleString()}
+          </div>
+        </div>
+      `).join('');
+      
+      resultsEl.style.display = 'block';
+    } catch (err) {
+      console.error('Product search error:', err);
+    }
+  }, 300);
+}
+
+function selectProductForInvoice(name, costJpy, priceHkd) {
+  const margin = parseFloat(document.getElementById('inv-margin').value) || 0;
+  const rate = parseFloat(document.getElementById('inv-rate').value) || 0.052;
+  
+  // 計算售價
+  const costTotal = costJpy * rate;
+  let finalPrice = priceHkd;
+  if (finalPrice <= 0 && costTotal > 0 && margin < 100) {
+    finalPrice = costTotal / (1 - margin / 100);
+  }
+  
+  invItems.push({ desc: name, qty: 1, costJpy, price: finalPrice });
+  renderInvItems();
+  
+  // 清空搜尋框和結果
+  document.getElementById('inv-product-search').value = '';
+  document.getElementById('inv-product-results').style.display = 'none';
+}
+
+// 編輯發票
+let editingInvoiceId = null;
+
+async function editInvoice(id) {
+  const invoice = invoices.find(i => i.id === id);
+  if (!invoice) {
+    alert('❌ 找不到發票');
+    return;
+  }
+  
+  editingInvoiceId = id;
+  
+  // items 可能係字符串或對象，需要處理
+  if (typeof invoice.items === 'string') {
+    invItems = JSON.parse(invoice.items);
+  } else {
+    invItems = invoice.items || [];
+  }
+  
+  document.getElementById('inv-no').value = invoice.no || '';
+  document.getElementById('inv-client').value = invoice.client || '';
+  document.getElementById('inv-email').value = invoice.clientEmail || '';
+  document.getElementById('inv-address').value = invoice.clientAddress || '';
+  document.getElementById('inv-date').value = invoice.date || '';
+  document.getElementById('inv-margin').value = (invoice.margin !== undefined ? invoice.margin : 10);
+  document.getElementById('inv-rate').value = (invoice.exchangeRate !== undefined ? invoice.exchangeRate : 0.052);
+  
+  // 更新表單標題
+  document.getElementById('invoice-modal-title').textContent = '✏️ 編輯發票';
+  
+  renderInvItems();
+  
+  // 確保 modal 正確顯示
+  const modal = document.getElementById('modal-invoice');
+  if (modal) {
+    modal.classList.add('active');
+    modal.style.display = 'flex';
+  }
+}
+
+async function saveInvoice() {
+  const client = document.getElementById('inv-client').value.trim();
+  if (!client) { alert('⚠️ 請輸入客戶名稱'); return; }
+  if (client.length > 200) { alert('⚠️ 客戶名稱不能超過 200 字元'); return; }
+  
+  if (!invItems.length || !invItems.some(it => it.desc && it.price > 0)) {
+    alert('⚠️ 請輸入最少一項有效項目'); return;
+  }
+  
+  // 驗證每個項目
+  for (let i = 0; i < invItems.length; i++) {
+    const it = invItems[i];
+    if (it.desc && it.desc.length > 500) {
+      alert(`⚠️ 項目 ${i+1} 描述太長（最多 500 字元）`); return;
+    }
+    if (it.costJpy < 0) {
+      alert(`⚠️ 項目 ${i+1} 成本不能為負數`); return;
+    }
+  }
+  
+  const email = document.getElementById('inv-email').value.trim();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    alert('⚠️ 電郵格式不正確'); return;
+  }
+  
+  const margin = parseFloat(document.getElementById('inv-margin').value) || 0;
+  const rate = parseFloat(document.getElementById('inv-rate').value) || 0.052;
+  
+  if (margin < 0 || margin >= 100) {
+    alert('⚠️ 利潤率必須在 0-99% 之間'); return;
+  }
+  if (rate <= 0) {
+    alert('⚠️ 匯率必須大於 0'); return;
+  }
+  
+  const validItems = invItems.filter(it => it.desc && it.price > 0).map(it => ({
+    desc: it.desc.slice(0, 500),
+    qty: it.qty || 1,
+    costJpy: it.costJpy || 0,
+    price: it.price || 0
+  }));
+  
+  const inv = {
+    id: editingInvoiceId || 'INV-' + Date.now(),
+    no: document.getElementById('inv-no').value.slice(0, 50),
+    client,
+    client_email: email,
+    client_address: document.getElementById('inv-address').value.trim().slice(0, 1000),
+    date: document.getElementById('inv-date').value,
+    items: validItems,
+    paid: editingInvoiceId ? (invoices.find(i => i.id === editingInvoiceId) || {}).paid : false,
+    margin,
+    exchange_rate: rate
+  };
+  
+  localStorage.setItem('lastMargin', margin);
+  localStorage.setItem('lastRate', rate);
+  
+  try {
+    if (editingInvoiceId) {
+      await api('/api/invoices/' + editingInvoiceId, { method: 'PUT', body: JSON.stringify(inv) });
+    } else {
+      await api('/api/invoices', { method: 'POST', body: JSON.stringify(inv) });
+    }
+    closeModal('invoice');
+    await loadData();
+    renderInvoices();
+    editingInvoiceId = null;
+  } catch (err) {
+    alert('❌ 儲存失敗：' + err.message);
+  }
+}
+
+function openNewInvoice() {
+  editingInvoiceId = null;
+  invItems = [{ desc: '', qty: 1, costJpy: 0, price: 0 }];
+  document.getElementById('inv-no').value = 'INV-' + Date.now().toString().slice(-6);
+  ['client','email','address'].forEach(f => document.getElementById('inv-' + f).value = '');
+  document.getElementById('inv-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('inv-margin').value = localStorage.getItem('lastMargin') || '10';
+  document.getElementById('inv-rate').value = localStorage.getItem('lastRate') || '0.052';
+  
+  // 更新表單標題
+  document.getElementById('invoice-modal-title').textContent = '📄 新增發票';
+  
+  renderInvItems(); 
+  openModal('invoice');
+}
 loadData().then(function() {
   // Handle hash routing on first load
   if (window.location.hash && window.location.hash.match(/^#invoice\//)) {
@@ -959,44 +1203,9 @@ function viewInvoice(id) {
 }
 
 function downloadInvoicePDF(id) {
-  var inv = invoices.find(function(i){ return i.id === id; });
-  if (!inv) return;
-  var total = 0;
-  var rows = (inv.items || []).map(function(it) {
-    var qty = it.qty || 1;
-    var sale = qty * (it.price || 0);
-    total += sale;
-    return '<tr><td>' + escHtml(it.desc || '-') + '</td><td style="text-align:center">' + qty + '</td><td style="text-align:right">$' + (it.price || 0).toFixed(2) + '</td><td style="text-align:right">$' + sale.toFixed(2) + '</td></tr>';
-  }).join('');
-  var bg = inv.paid ? '#00d4aa' : '#ff6b6b';
-  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice ' + escHtml(inv.no || '') + '</title>' +
-    '<style>body{font-family:Arial,sans-serif;padding:40px;max-width:700px;margin:0 auto;color:#333}' +
-    '.hdr{margin-bottom:24px}.title{font-size:28px;font-weight:bold}.sub{color:#888;font-size:13px;margin-top:4px}' +
-    '.meta{margin:12px 0;font-size:14px;line-height:1.7}.bold{font-weight:bold}' +
-    'table{width:100%;border-collapse:collapse;margin-top:16px}' +
-    '.th{background:#f0f0f0;padding:8px 10px;text-align:left;font-size:12px;font-weight:bold}' +
-    '.td{padding:8px 10px;border-bottom:1px solid #eee;font-size:13px}' +
-    '.r{text-align:right}.totals{margin-top:16px;text-align:right}' +
-    '.tr{display:flex;justify-content:flex-end;gap:40px;padding:5px 0;border-bottom:1px solid #eee}' +
-    '.tl{color:#666;min-width:100px}.tv{font-weight:bold;min-width:100px}' +
-    '.badge{display:inline-block;padding:6px 14px;border-radius:20px;color:#fff;font-size:12px;font-weight:bold;margin-top:16px}' +
-    '</style></head><body>' +
-    '<div class="hdr"><div class="title">INVOICE</div><div class="sub">' + escHtml(inv.no || '') + '</div></div>' +
-    '<div class="meta"><span class="bold">' + escHtml(inv.client || '') + '</span>' +
-    (inv.client_email ? '<br>📧 ' + escHtml(inv.client_email) : '') +
-    (inv.client_address ? '<br>📍 ' + escHtml(inv.client_address) : '') +
-    '</div>' +
-    '<div class="meta">📅 日期: ' + escHtml(inv.date || '') + '</div>' +
-    '<table><thead><tr><th class="th">描述</th><th class="th r">數量</th><th class="th r">單價 (HKD)</th><th class="th r">合計</th></tr></thead><tbody>' + rows + '</tbody></table>' +
-    '<div class="totals">' +
-      '<div class="tr"><span class="tl">總銷售</span><span class="tv">$' + total.toFixed(2) + '</span></div>' +
-    '</div>' +
-    '<div><span class="badge" style="background:' + bg + '">' + (inv.paid ? 'PAID' : 'UNPAID') + '</span></div>' +
-    '</body></html>';
-  var w = window.open('', '_blank');
-  w.document.write(html);
-  w.document.close();
-  setTimeout(function() { w.print(); }, 500);
+  // 使用後端 API 生成專業 PDF
+  var url = API_BASE + "/api/invoices/" + encodeURIComponent(id) + "/pdf";
+  window.open(url, "_blank");
 }
 
 function sendInvoiceEmail(id) {
