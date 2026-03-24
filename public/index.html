@@ -511,6 +511,8 @@ function renderInvoices() {
               <p style="color:#888;font-size:12px">${escHtml(i.date || '-')} · ${i.items?.length || 0} 項目</p>
             </div>
             <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+              <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();editInvoice('${i.id}')" title="編輯發票">✏️</button>
+              <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();downloadInvoicePDF('${i.id}')" title="下載 PDF">📥</button>
               <span style="font-weight:600;font-size:14px">$${total.toLocaleString()}</span>
               <span class="status ${i.paid ? 'paid' : 'unpaid'}">${i.paid ? '已付' : '未付'}</span>
               <span class="inv-chevron">▼</span>
