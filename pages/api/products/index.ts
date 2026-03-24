@@ -11,17 +11,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     if (req.method === 'GET') {
-      const { q } = req.query;
+      const { q, page = '1', limit = '50' } = req.query;
+      const pageNum = parseInt(page as string, 10);
+      const limitNum = parseInt(limit as string, 10);
+      const offset = (pageNum - 1) * limitNum;
+      
       let results;
+      let total;
+      
       if (q) {
+        // 搜尋產品
         results = await db.select().from(products)
           .where(like(products.name, `%${q}%`))
-          .limit(50);
+          .limit(limitNum)
+          .offset(offset)
+          .orderBy(products.name);
+        
+        // 獲取總數
+        const allProducts = await db.select().from(products)
+          .where(like(products.name, `%${q}%`));
+        total = allProducts.length;
       } else {
-        results = await db.select().from(products).orderBy(products.name);
+        // 獲取所有產品（分頁）
+        results = await db.select().from(products)
+          .limit(limitNum)
+          .offset(offset)
+          .orderBy(products.name);
+        
+        // 獲取總數
+        const allProducts = await db.select().from(products);
+        total = allProducts.length;
       }
+      
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      return res.end(JSON.stringify(results));
+      return res.end(JSON.stringify({ 
+        products: results, 
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
+      }));
     }
 
     if (req.method === 'POST') {
