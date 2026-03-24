@@ -1200,6 +1200,24 @@ function sendInvoiceEmail(id) {
   window.open('mailto:' + encodeURIComponent(email) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body), '_blank');
 }
 
+
+// 頁面初始化：載入數據
+document.addEventListener('DOMContentLoaded', async function() {
+  console.log('🚀 Page loaded, starting loadData...');
+  try {
+    await loadData();
+    console.log('✅ Data loaded:', { customers: customers.length, invoices: invoices.length, products: products.length });
+    renderDashboard();
+    renderInvoices();
+    renderCustomers();
+    renderProducts();
+    renderRecords();
+    console.log('✅ All views rendered');
+  } catch (err) {
+    console.error('❌ Failed to load data:', err);
+    alert('載入失敗：' + err.message);
+  }
+});
 </script>
 </body>
 </html>
