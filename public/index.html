@@ -935,11 +935,18 @@ function selectProductForInvoice(name, costJpy, priceHkd) {
 let editingInvoiceId = null;
 
 async function editInvoice(id) {
-  const invoice = invoices.find(i => i.id === id);
+  console.log('editInvoice called with id:', id);
+  console.log('invoices array:', invoices);
+  console.log('invoices length:', invoices ? invoices.length : 'undefined');
+  
+  const invoice = invoices ? invoices.find(i => i.id === id) : null;
   if (!invoice) {
-    alert('❌ 找不到發票');
+    console.error('Invoice not found:', id);
+    alert('❌ 找不到發票\n\n請刷新頁面重試');
     return;
   }
+  
+  console.log('Found invoice:', invoice);
   
   editingInvoiceId = id;
   
@@ -962,6 +969,18 @@ async function editInvoice(id) {
   document.getElementById('invoice-modal-title').textContent = '✏️ 編輯發票';
   
   renderInvItems();
+  
+  // 確保 modal 正確顯示
+  const modal = document.getElementById('modal-invoice');
+  console.log('Modal element:', modal);
+  console.log('Modal classList before:', modal ? modal.classList : 'null');
+  
+  if (modal) {
+    modal.classList.add('active');
+    console.log('Modal classList after:', modal.classList);
+  } else {
+    console.error('Modal element not found!');
+  }
   
   // 確保 modal 正確顯示
   const modal = document.getElementById('modal-invoice');
