@@ -86,19 +86,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // ===== 客戶信息 =====
     doc.fontSize(10).font('Helvetica-Bold').text('Bill To:', 50, 120);
     doc.fontSize(10).font('Helvetica').text(invoice.client, 50, 135, { 
-      width: maxWidth,
-      wordWrap: true
+      width: maxWidth
     });
     if (invoice.clientEmail) {
       doc.text(invoice.clientEmail, 50, 150, { 
-        width: maxWidth,
-        wordWrap: true
+        width: maxWidth
       });
     }
     if (invoice.clientAddress) {
       doc.text(invoice.clientAddress, 50, 165, { 
-        width: maxWidth,
-        wordWrap: true
+        width: maxWidth
       });
     }
 
@@ -129,8 +126,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const total = qty * price;
       
       doc.text(item.desc || '-', tableLeft, yPos, { 
-        width: colWidths.desc,
-        wordWrap: true
+        width: colWidths.desc
       });
       doc.text(String(qty), tableLeft + colWidths.desc, yPos, { width: colWidths.qty, align: 'center' });
       doc.text(`$${price.toFixed(2)}`, tableLeft + colWidths.desc + colWidths.qty, yPos, { width: colWidths.price, align: 'right' });
