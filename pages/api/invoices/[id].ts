@@ -27,10 +27,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'PUT') {
-      const { no, client, client_email, client_address, date, items, paid, exchange_rate } = req.body;
+      const { no, client, client_email, client_address, date, items, paid, exchange_rate, margin } = req.body;
       await db.update(invoices).set({
         no, client, clientEmail: client_email || '', clientAddress: client_address || '',
-        date, items: JSON.stringify(items), paid: paid ? 1 : 0, exchangeRate: exchange_rate || 0
+        date, items: JSON.stringify(items), paid: paid ? 1 : 0, 
+        exchangeRate: exchange_rate || 0, margin: margin || 0
       }).where(eq(invoices.id, id as string));
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       return res.end(JSON.stringify(req.body));

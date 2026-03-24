@@ -936,7 +936,10 @@ let editingInvoiceId = null;
 
 async function editInvoice(id) {
   const invoice = invoices.find(i => i.id === id);
-  if (!invoice) return;
+  if (!invoice) {
+    alert('❌ 找不到發票');
+    return;
+  }
   
   editingInvoiceId = id;
   invItems = JSON.parse(invoice.items || '[]');
@@ -946,8 +949,8 @@ async function editInvoice(id) {
   document.getElementById('inv-email').value = invoice.clientEmail || '';
   document.getElementById('inv-address').value = invoice.clientAddress || '';
   document.getElementById('inv-date').value = invoice.date || '';
-  document.getElementById('inv-margin').value = invoice.margin || '10';
-  document.getElementById('inv-rate').value = invoice.exchangeRate || '0.052';
+  document.getElementById('inv-margin').value = (invoice.margin !== undefined ? invoice.margin : 10);
+  document.getElementById('inv-rate').value = (invoice.exchangeRate !== undefined ? invoice.exchangeRate : 0.052);
   
   renderInvItems();
   openModal('invoice');
