@@ -1195,10 +1195,22 @@ function viewInvoice(id) {
   openModal('invoice-detail');
 }
 
-function downloadInvoicePDF(id) {
-  // 使用後端 API 生成專業 PDF
-  var url = API_BASE + "/api/invoices/" + encodeURIComponent(id) + "/pdf";
-  window.open(url, "_blank");
+async function downloadInvoicePDF(id) {
+  // 使用 DocRaptor 生成專業 PDF（支持日文/中文）
+  try {
+    const url = API_BASE + "/api/invoices/" + encodeURIComponent(id) + "/pdf-docraptor";
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.success && data.downloadUrl) {
+      // 在新分頁打開 PDF
+      window.open(data.downloadUrl, '_blank');
+    } else {
+      alert('❌ PDF 生成失敗：' + (data.message || '未知錯誤'));
+    }
+  } catch (err) {
+    alert('❌ PDF 生成失敗：' + err.message);
+  }
 }
 
 function sendInvoiceEmail(id) {
