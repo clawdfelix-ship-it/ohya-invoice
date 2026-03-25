@@ -66,17 +66,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const maxWidth = pageWidth - 100; // 495 (左右各 50 邊距)
 
     // ===== 頁眉 =====
-    doc.fontSize(24).font('Helvetica-Bold').text('INVOICE', pageWidth - 50 - 100, 50, { 
-      width: 100, 
+    doc.fontSize(24).font('Helvetica-Bold').text('INVOICE', pageWidth - 50 - 120, 50, { 
+      width: 120, 
       align: 'right' 
     });
     
-    doc.fontSize(10).font('Helvetica').text(`Invoice No: ${invoice.no}`, pageWidth - 50 - 100, 75, { 
-      width: 100, 
+    doc.fontSize(9).font('Helvetica').text(`Invoice No:`, pageWidth - 50 - 120, 78, { 
+      width: 120, 
       align: 'right' 
     });
-    doc.text(`Date: ${invoice.date}`, pageWidth - 50 - 100, 88, { 
-      width: 100, 
+    doc.fontSize(10).font('Helvetica-Bold').text(`${invoice.no}`, pageWidth - 50 - 120, 90, { 
+      width: 120, 
+      align: 'right' 
+    });
+    doc.fontSize(9).font('Helvetica').text(`Date:`, pageWidth - 50 - 120, 105, { 
+      width: 120, 
+      align: 'right' 
+    });
+    doc.fontSize(10).font('Helvetica-Bold').text(`${invoice.date}`, pageWidth - 50 - 120, 117, { 
+      width: 120, 
       align: 'right' 
     });
     
@@ -84,23 +92,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     doc.moveTo(50, 100).lineTo(pageWidth - 50, 100).strokeColor('#000').lineWidth(1).stroke();
 
     // ===== 客戶信息 =====
-    doc.fontSize(10).font('Helvetica-Bold').text('Bill To:', 50, 120);
-    doc.fontSize(10).font('Helvetica').text(invoice.client, 50, 135, { 
+    doc.fontSize(10).font('Helvetica-Bold').text('Bill To:', 50, 145);
+    doc.fontSize(10).font('Helvetica').text(invoice.client, 50, 160, { 
       width: maxWidth
     });
     if (invoice.clientEmail) {
-      doc.text(invoice.clientEmail, 50, 150, { 
+      doc.text(invoice.clientEmail, 50, 175, { 
         width: maxWidth
       });
     }
     if (invoice.clientAddress) {
-      doc.text(invoice.clientAddress, 50, 165, { 
+      doc.text(invoice.clientAddress, 50, 190, { 
         width: maxWidth
       });
     }
 
     // ===== 項目表格 =====
-    const tableTop = 200;
+    const tableTop = 220;
     const tableLeft = 50;
     // 欄位寬度總和：300 + 50 + 70 + 75 = 495 = maxWidth
     const colWidths = { desc: 300, qty: 50, price: 70, total: 75 };
